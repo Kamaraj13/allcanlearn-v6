@@ -14,7 +14,6 @@ from fastapi import WebSocket, WebSocketDisconnect
 from datetime import datetime
 from app.moderator import run_roundtable
 from app.episodes import get_audio_files, add_episode, get_all_episodes
-from app.cleanup import cleanup_old_audio_files
 from app.quiz_generator import generate_quiz_questions, generate_topic_description
 from app.chat import manager
 

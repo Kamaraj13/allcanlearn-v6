@@ -133,127 +133,6 @@ The panel consists of:
 - Citizen: Asks questions and provides public perspective
 
 Always return your response as a valid JSON array with the exact format specified. Do not include any explanations or text outside the JSON array. Make the discussion realistic, helpful, and engaging for aspirants."""
-def parse_responses(response):
-    """Parse JSON response from Groq API."""
-    try:
-        if isinstance(response, str):
-            return json.loads(response)
-        elif isinstance(response, list):
-            return response
-        else:
-            return []
-    except (json.JSONDecodeError, TypeError) as e:
-        print(f"Error parsing responses: {e}")
-        return []
-
-def normalize_responses(parsed_responses, characters):
-    """Normalize parsed responses to ensure proper speaker matching and structure."""
-    normalized = []
-    
-    if not parsed_responses or not isinstance(parsed_responses, list):
-        return normalized
-    
-    character_names = [char["name"] for char in characters]
-    
-    for i, response in enumerate(parsed_responses):
-        if not isinstance(response, dict):
-            continue
-            
-        speaker = response.get("speaker", "")
-        message = response.get("message", "")
-        
-        if not message.strip():
-            continue
-            
-        if speaker not in character_names:
-            for char_name in character_names:
-                if speaker.lower() in char_name.lower() or char_name.lower() in speaker.lower():
-                    speaker = char_name
-                    break
-            else:
-                if i < len(characters):
-                    speaker = characters[i]["name"]
-                else:
-                    speaker = characters[0]["name"]
-        
-        normalized.append({
-            "speaker": speaker,
-            "message": message,
-            "audio_file": None
-        })
-    
-    return normalized
-
-def attach_accents(parsed_responses, characters):
-    """Attach accent information to parsed responses."""
-    character_map = {char["name"]: char for char in characters}
-    
-    for response in parsed_responses:
-        speaker = response.get("speaker", "")
-        if speaker in character_map:
-            response["accent"] = character_map[speaker].get("accent", "default")
-        else:
-            response["accent"] = "default"
-    
-    return parsed_responses
-
-def build_government_jobs_prompt(turns, topic, characters):
-    """Build the prompt for government jobs discussions."""
-    if not turns:
-        return f"""Create a roundtable discussion about "{topic}" with 4 government job experts: Exam Strategist, Serving Officer, Fresh Qualifier, and Citizen.
-        
-Each person should provide their unique perspective on {topic} from their role:
-- Exam Strategist: Strategic advice and preparation tips
-- Serving Officer: Real-world experience and insights  
-- Fresh Qualifier: Recent experience and relatable struggles
-- Citizen: Public perspective and questions
-
-Return your response as a JSON array with this format:
-[
-    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
-    {{"speaker": "Serving Officer", "message": "real-world insights"}},
-    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
-    {{"speaker": "Citizen", "message": "public perspective"}}
-]
-
-Keep responses concise but informative (2-3 sentences each)."""
-    else:
-        last_turn = turns[-1] if turns else None
-        context = ""
-        if last_turn:
-            context = "The last speaker was " + str(last_turn.get("speaker", "Someone")) + " who said: " + str(last_turn.get("message", ""))
-        
-        return f"""Continue the government jobs discussion about "{topic}" with the same 4 experts.
-        
-{context}
-
-Each speaker should:
-- React to previous points when relevant
-- Add new insights from their perspective
-- Keep responses concise (2-3 sentences each)
-
-Return as JSON array:
-[
-    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
-    {{"speaker": "Serving Officer", "message": "real-world insights"}},
-    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
-    {{"speaker": "Citizen", "message": "public perspective"}}
-]"""
-
-def build_government_jobs_system_prompt(characters):
-    """Build the system prompt for government jobs discussions."""
-    return """You are facilitating an informative roundtable discussion about government jobs and competitive exams in India. 
-
-The panel consists of:
-- Exam Strategist: Provides strategic guidance and preparation advice
-- Serving Officer: Shares real experience from working in government
-- Fresh Qualifier: Recently cleared exams, shares current experience
-- Citizen: Asks questions and provides public perspective
-
-Always return your response as a valid JSON array with the exact format specified. Do not include any explanations or text outside the JSON array. Make the discussion realistic, helpful, and engaging for aspirants."""
-
-
-
 async def generate_tts_batch(entries, tts_enabled):
     """Parallelize TTS generation for multiple speakers at once."""
     if not tts_enabled:
@@ -539,3 +418,243 @@ Return your response as a JSON array with this format:
     }
 
 
+
+async def run_travel_roundtable(tts_enabled=True):
+    """Run a roundtable discussion about travel destinations."""
+    topic = "Travel Destinations and Experiences"
+    characters = TRAVEL_CHARACTERS
+    turns = []
+
+    intro = (
+        f"Welcome to the AI Roundtable. Today we discuss {topic}. "
+        "Our panel includes experienced travelers and tourism experts."
+    )
+
+    turns.append({
+        "speaker": "Moderator",
+        "message": intro,
+        "tts": None,
+    })
+
+    for turn in range(MAX_TURNS):
+        if turn == 0:
+            prompt = f"""Create a roundtable discussion about "{topic}" with travel experts.
+Each person should provide their unique perspective on travel experiences.
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Travel Expert", "message": "travel insights"}},
+    {{"speaker": "Tourism Professional", "message": "industry perspective"}},
+    {{"speaker": "Experienced Traveler", "message": "personal experience"}},
+    {{"speaker": "Local Guide", "message": "local insights"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+        else:
+            prompt = f"""Continue the travel discussion about "{topic}".
+Build upon previous points. Each speaker should:
+- React to what others said
+- Add new insights or ask questions
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array with the same format."""
+
+        response = await call_groq([
+            {"role": "system", "content": "You are facilitating an engaging travel discussion with experts. Always return your response as a valid JSON array."},
+            {"role": "user", "content": prompt},
+        ])
+
+        parsed = normalize_responses(parse_responses(response), characters)
+        parsed = attach_accents(parsed, characters)
+        parsed = await generate_tts_batch(parsed, tts_enabled)
+
+        for entry in parsed:
+            turns.append({
+                "speaker": entry["speaker"],
+                "message": entry["message"],
+                "tts": entry.get("tts"),
+            })
+
+    return {
+        "topic": topic,
+        "turns": turns,
+    }
+
+async def run_tech_startup_roundtable(tts_enabled=True):
+    """Run a roundtable discussion about tech startups."""
+    topic = "Tech Startups and Innovation"
+    characters = TECH_STARTUP_CHARACTERS
+    turns = []
+
+    intro = (
+        f"Welcome to the AI Roundtable. Today we discuss {topic}. "
+        "Our panel includes startup founders and tech experts."
+    )
+
+    turns.append({
+        "speaker": "Moderator",
+        "message": intro,
+        "tts": None,
+    })
+
+    for turn in range(MAX_TURNS):
+        if turn == 0:
+            prompt = f"""Create a roundtable discussion about "{topic}" with tech startup experts.
+Each person should provide their unique perspective on startups and innovation.
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Startup Founder", "message": "founder perspective"}},
+    {{"speaker": "VC Investor", "message": "investment insights"}},
+    {{"speaker": "Tech Expert", "message": "technical perspective"}},
+    {{"speaker": "Product Manager", "message": "product insights"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+        else:
+            prompt = f"""Continue the tech startup discussion about "{topic}".
+Build upon previous points. Each speaker should:
+- React to what others said
+- Add new insights or ask questions
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array with the same format."""
+
+        response = await call_groq([
+            {"role": "system", "content": "You are facilitating an engaging tech startup discussion with experts. Always return your response as a valid JSON array."},
+            {"role": "user", "content": prompt},
+        ])
+
+        parsed = normalize_responses(parse_responses(response), characters)
+        parsed = attach_accents(parsed, characters)
+        parsed = await generate_tts_batch(parsed, tts_enabled)
+
+        for entry in parsed:
+            turns.append({
+                "speaker": entry["speaker"],
+                "message": entry["message"],
+                "tts": entry.get("tts"),
+            })
+
+    return {
+        "topic": topic,
+        "turns": turns,
+    }
+
+async def run_personal_finance_roundtable(tts_enabled=True):
+    """Run a roundtable discussion about personal finance."""
+    topic = "Personal Finance and Wealth Management"
+    characters = PERSONAL_FINANCE_CHARACTERS
+    turns = []
+
+    intro = (
+        f"Welcome to the AI Roundtable. Today we discuss {topic}. "
+        "Our panel includes finance experts and financial advisors."
+    )
+
+    turns.append({
+        "speaker": "Moderator",
+        "message": intro,
+        "tts": None,
+    })
+
+    for turn in range(MAX_TURNS):
+        if turn == 0:
+            prompt = f"""Create a roundtable discussion about "{topic}" with personal finance experts.
+Each person should provide their unique perspective on financial management.
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Financial Advisor", "message": "advice"}},
+    {{"speaker": "Investment Expert", "message": "investment insights"}},
+    {{"speaker": "Tax Specialist", "message": "tax perspective"}},
+    {{"speaker": "Budget Coach", "message": "budgeting tips"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+        else:
+            prompt = f"""Continue the personal finance discussion about "{topic}".
+Build upon previous points. Each speaker should:
+- React to what others said
+- Add new insights or ask questions
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array with the same format."""
+
+        response = await call_groq([
+            {"role": "system", "content": "You are facilitating an engaging personal finance discussion with experts. Always return your response as a valid JSON array."},
+            {"role": "user", "content": prompt},
+        ])
+
+        parsed = normalize_responses(parse_responses(response), characters)
+        parsed = attach_accents(parsed, characters)
+        parsed = await generate_tts_batch(parsed, tts_enabled)
+
+        for entry in parsed:
+            turns.append({
+                "speaker": entry["speaker"],
+                "message": entry["message"],
+                "tts": entry.get("tts"),
+            })
+
+    return {
+        "topic": topic,
+        "turns": turns,
+    }
+
+async def run_mental_health_roundtable(tts_enabled=True):
+    """Run a roundtable discussion about mental health."""
+    topic = "Mental Health and Wellness"
+    characters = MENTAL_HEALTH_CHARACTERS
+    turns = []
+
+    intro = (
+        f"Welcome to the AI Roundtable. Today we discuss {topic}. "
+        "Our panel includes mental health professionals and wellness experts."
+    )
+
+    turns.append({
+        "speaker": "Moderator",
+        "message": intro,
+        "tts": None,
+    })
+
+    for turn in range(MAX_TURNS):
+        if turn == 0:
+            prompt = f"""Create a roundtable discussion about "{topic}" with mental health experts.
+Each person should provide their unique perspective on mental health and wellness.
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Psychologist", "message": "psychological insights"}},
+    {{"speaker": "Therapist", "message": "therapy perspective"}},
+    {{"speaker": "Wellness Coach", "message": "wellness advice"}},
+    {{"speaker": "Mental Health Advocate", "message": "advocacy perspective"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+        else:
+            prompt = f"""Continue the mental health discussion about "{topic}".
+Build upon previous points. Each speaker should:
+- React to what others said
+- Add new insights or ask questions
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array with the same format."""
+
+        response = await call_groq([
+            {"role": "system", "content": "You are facilitating an engaging mental health discussion with experts. Always return your response as a valid JSON array."},
+            {"role": "user", "content": prompt},
+        ])
+
+        parsed = normalize_responses(parse_responses(response), characters)
+        parsed = attach_accents(parsed, characters)
+        parsed = await generate_tts_batch(parsed, tts_enabled)
+
+        for entry in parsed:
+            turns.append({
+                "speaker": entry["speaker"],
+                "message": entry["message"],
+                "tts": entry.get("tts"),
+            })
+
+    return {
+        "topic": topic,
+        "turns": turns,
+    }
