@@ -1,0 +1,9 @@
+tunnel: 47bd781a-8d30-42c5-84f5-13e095a62572
+credentials-file: /home/vikki/.cloudflared/47bd781a-8d30-42c5-84f5-13e095a62572.json
+
+ingress:
+  - hostname: allcanlearn.uk
+    service: http://localhost:8000
+  - hostname: www.allcanlearn.uk
+    service: http://localhost:8000
+  - service: http_status:404

@@ -39,33 +39,57 @@ def resolve_voice(accent):
         return VOICE_MAP_LINUX.get(accent, VOICE_MAP_LINUX["default"])
 
 async def speak_text(text, accent, folder="tts_output"):
-    """Generate speech audio file using platform-appropriate TTS"""
+    """Generate speech audio file using platform-appropriate TTS and convert to MP3"""
     os.makedirs(folder, exist_ok=True)
     
     timestamp = int(time.time() * 1000)
     
     if is_macos():
-        # macOS: use native 'say' command with AIFF format (for local testing only)
-        filename = f"{timestamp}.aiff"
-        filepath = os.path.join(folder, filename)
+        # macOS: use native 'say' command, then convert to MP3
+        aiff_filename = f"{timestamp}.aiff"
+        aiff_filepath = os.path.join(folder, aiff_filename)
+        mp3_filename = f"{timestamp}.mp3"
+        mp3_filepath = os.path.join(folder, mp3_filename)
+        
         voice = resolve_voice(accent)
-        subprocess.run(["say", "-v", voice, text, "-o", filepath], check=True)
+        subprocess.run(["say", "-v", voice, text, "-o", aiff_filepath], check=True)
+        
+        # Convert AIFF to MP3 using ffmpeg (if available) or keep AIFF
+        try:
+            subprocess.run([
+                "ffmpeg", "-i", aiff_filepath, "-codec:a", "mp3", "-b:a", "64k", 
+                "-y", mp3_filepath
+            ], check=True, capture_output=True)
+            # Remove original AIFF file to save space
+            os.remove(aiff_filepath)
+            return mp3_filename
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to AIFF if ffmpeg not available
+            return aiff_filename
     else:
-        # Linux: use espeak-ng with improved quality settings
-        filename = f"{timestamp}.wav"
-        filepath = os.path.join(folder, filename)
+        # Linux: use espeak-ng with WAV output, then convert to MP3
+        wav_filename = f"{timestamp}.wav"
+        wav_filepath = os.path.join(folder, wav_filename)
+        mp3_filename = f"{timestamp}.mp3"
+        mp3_filepath = os.path.join(folder, mp3_filename)
+        
         voice = resolve_voice(accent)
         
-        # espeak-ng with quality improvements for clarity:
-        # -s: speed 100 (very slow for crystal clear speech, default is 175)
-        # -p: pitch 50 (natural tone)
-        # -a: amplitude 200 (very loud and clear, boost from 100 default)
-        # -g: word gap 15ms (increase pause between words for clarity)
-        subprocess.run(
-            ["espeak-ng", "-v", voice, "-s", "100", "-p", "50", "-a", "200", "-g", "15", "-w", filepath, text],
-            check=True,
-            capture_output=True
-        )
-    
-    # Return just filename for storage - path construction happens at higher level
-    return filename
+        # Generate WAV first with significantly improved clarity
+        subprocess.run([
+            "espeak-ng", "-v", voice, "-s", "140", "-p", "50", "-a", "180", 
+            "-g", "2", "-k", "20", "-w", wav_filepath, text
+        ], check=True, capture_output=True)
+        
+        # Convert to MP3 with premium quality
+        try:
+            subprocess.run([
+                "ffmpeg", "-i", wav_filepath, "-codec:a", "mp3", "-b:a", "128k", 
+                "-ar", "44100", "-q:a", "0", "-compression_level", "0", "-y", mp3_filepath
+            ], check=True, capture_output=True)
+            # Remove original WAV file to save space
+            os.remove(wav_filepath)
+            return mp3_filename
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            # Fallback to WAV if ffmpeg not available
+            return wav_filename
