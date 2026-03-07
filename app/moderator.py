@@ -15,6 +15,245 @@ MAX_TURNS = 8  # Increased for better quality discussions
 MAX_ESSENTIAL_TURNS = 20  # Extended Essential Topics for deeper content
 
 
+def parse_responses(response):
+    """Parse JSON response from Groq API."""
+    try:
+        if isinstance(response, str):
+            return json.loads(response)
+        elif isinstance(response, list):
+            return response
+        else:
+            return []
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"Error parsing responses: {e}")
+        return []
+
+def normalize_responses(parsed_responses, characters):
+    """Normalize parsed responses to ensure proper speaker matching and structure."""
+    normalized = []
+    
+    if not parsed_responses or not isinstance(parsed_responses, list):
+        return normalized
+    
+    character_names = [char["name"] for char in characters]
+    
+    for i, response in enumerate(parsed_responses):
+        if not isinstance(response, dict):
+            continue
+            
+        speaker = response.get("speaker", "")
+        message = response.get("message", "")
+        
+        if not message.strip():
+            continue
+            
+        if speaker not in character_names:
+            for char_name in character_names:
+                if speaker.lower() in char_name.lower() or char_name.lower() in speaker.lower():
+                    speaker = char_name
+                    break
+            else:
+                if i < len(characters):
+                    speaker = characters[i]["name"]
+                else:
+                    speaker = characters[0]["name"]
+        
+        normalized.append({
+            "speaker": speaker,
+            "message": message,
+            "audio_file": None
+        })
+    
+    return normalized
+
+def attach_accents(parsed_responses, characters):
+    """Attach accent information to parsed responses."""
+    character_map = {char["name"]: char for char in characters}
+    
+    for response in parsed_responses:
+        speaker = response.get("speaker", "")
+        if speaker in character_map:
+            response["accent"] = character_map[speaker].get("accent", "default")
+        else:
+            response["accent"] = "default"
+    
+    return parsed_responses
+
+def build_government_jobs_prompt(turns, topic, characters):
+    """Build the prompt for government jobs discussions."""
+    if not turns:
+        return f"""Create a roundtable discussion about "{topic}" with 4 government job experts: Exam Strategist, Serving Officer, Fresh Qualifier, and Citizen.
+        
+Each person should provide their unique perspective on {topic} from their role:
+- Exam Strategist: Strategic advice and preparation tips
+- Serving Officer: Real-world experience and insights  
+- Fresh Qualifier: Recent experience and relatable struggles
+- Citizen: Public perspective and questions
+
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
+    {{"speaker": "Serving Officer", "message": "real-world insights"}},
+    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
+    {{"speaker": "Citizen", "message": "public perspective"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+    else:
+        last_turn = turns[-1] if turns else None
+        context = ""
+        if last_turn:
+            context = "The last speaker was " + str(last_turn.get("speaker", "Someone")) + " who said: " + str(last_turn.get("message", ""))
+        
+        return f"""Continue the government jobs discussion about "{topic}" with the same 4 experts.
+        
+{context}
+
+Each speaker should:
+- React to previous points when relevant
+- Add new insights from their perspective
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array:
+[
+    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
+    {{"speaker": "Serving Officer", "message": "real-world insights"}},
+    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
+    {{"speaker": "Citizen", "message": "public perspective"}}
+]"""
+
+def build_government_jobs_system_prompt(characters):
+    """Build the system prompt for government jobs discussions."""
+    return """You are facilitating an informative roundtable discussion about government jobs and competitive exams in India. 
+
+The panel consists of:
+- Exam Strategist: Provides strategic guidance and preparation advice
+- Serving Officer: Shares real experience from working in government
+- Fresh Qualifier: Recently cleared exams, shares current experience
+- Citizen: Asks questions and provides public perspective
+
+Always return your response as a valid JSON array with the exact format specified. Do not include any explanations or text outside the JSON array. Make the discussion realistic, helpful, and engaging for aspirants."""
+def parse_responses(response):
+    """Parse JSON response from Groq API."""
+    try:
+        if isinstance(response, str):
+            return json.loads(response)
+        elif isinstance(response, list):
+            return response
+        else:
+            return []
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"Error parsing responses: {e}")
+        return []
+
+def normalize_responses(parsed_responses, characters):
+    """Normalize parsed responses to ensure proper speaker matching and structure."""
+    normalized = []
+    
+    if not parsed_responses or not isinstance(parsed_responses, list):
+        return normalized
+    
+    character_names = [char["name"] for char in characters]
+    
+    for i, response in enumerate(parsed_responses):
+        if not isinstance(response, dict):
+            continue
+            
+        speaker = response.get("speaker", "")
+        message = response.get("message", "")
+        
+        if not message.strip():
+            continue
+            
+        if speaker not in character_names:
+            for char_name in character_names:
+                if speaker.lower() in char_name.lower() or char_name.lower() in speaker.lower():
+                    speaker = char_name
+                    break
+            else:
+                if i < len(characters):
+                    speaker = characters[i]["name"]
+                else:
+                    speaker = characters[0]["name"]
+        
+        normalized.append({
+            "speaker": speaker,
+            "message": message,
+            "audio_file": None
+        })
+    
+    return normalized
+
+def attach_accents(parsed_responses, characters):
+    """Attach accent information to parsed responses."""
+    character_map = {char["name"]: char for char in characters}
+    
+    for response in parsed_responses:
+        speaker = response.get("speaker", "")
+        if speaker in character_map:
+            response["accent"] = character_map[speaker].get("accent", "default")
+        else:
+            response["accent"] = "default"
+    
+    return parsed_responses
+
+def build_government_jobs_prompt(turns, topic, characters):
+    """Build the prompt for government jobs discussions."""
+    if not turns:
+        return f"""Create a roundtable discussion about "{topic}" with 4 government job experts: Exam Strategist, Serving Officer, Fresh Qualifier, and Citizen.
+        
+Each person should provide their unique perspective on {topic} from their role:
+- Exam Strategist: Strategic advice and preparation tips
+- Serving Officer: Real-world experience and insights  
+- Fresh Qualifier: Recent experience and relatable struggles
+- Citizen: Public perspective and questions
+
+Return your response as a JSON array with this format:
+[
+    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
+    {{"speaker": "Serving Officer", "message": "real-world insights"}},
+    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
+    {{"speaker": "Citizen", "message": "public perspective"}}
+]
+
+Keep responses concise but informative (2-3 sentences each)."""
+    else:
+        last_turn = turns[-1] if turns else None
+        context = ""
+        if last_turn:
+            context = "The last speaker was " + str(last_turn.get("speaker", "Someone")) + " who said: " + str(last_turn.get("message", ""))
+        
+        return f"""Continue the government jobs discussion about "{topic}" with the same 4 experts.
+        
+{context}
+
+Each speaker should:
+- React to previous points when relevant
+- Add new insights from their perspective
+- Keep responses concise (2-3 sentences each)
+
+Return as JSON array:
+[
+    {{"speaker": "Exam Strategist", "message": "strategic advice"}},
+    {{"speaker": "Serving Officer", "message": "real-world insights"}},
+    {{"speaker": "Fresh Qualifier", "message": "recent experience"}},
+    {{"speaker": "Citizen", "message": "public perspective"}}
+]"""
+
+def build_government_jobs_system_prompt(characters):
+    """Build the system prompt for government jobs discussions."""
+    return """You are facilitating an informative roundtable discussion about government jobs and competitive exams in India. 
+
+The panel consists of:
+- Exam Strategist: Provides strategic guidance and preparation advice
+- Serving Officer: Shares real experience from working in government
+- Fresh Qualifier: Recently cleared exams, shares current experience
+- Citizen: Asks questions and provides public perspective
+
+Always return your response as a valid JSON array with the exact format specified. Do not include any explanations or text outside the JSON array. Make the discussion realistic, helpful, and engaging for aspirants."""
+
+
+
 async def generate_tts_batch(entries, tts_enabled):
     """Parallelize TTS generation for multiple speakers at once."""
     if not tts_enabled:
