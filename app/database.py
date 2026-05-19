@@ -2,10 +2,9 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-import os
+from app.config import settings
 
-# DB file lives at project root (same level as main.py is run from)
-DB_PATH = os.environ.get("DATABASE_URL", "sqlite:///allcanlearn.db")
+DB_PATH = settings.DATABASE_URL
 
 engine = create_engine(
     DB_PATH,

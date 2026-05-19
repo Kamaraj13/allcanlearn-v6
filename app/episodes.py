@@ -12,10 +12,11 @@ from pathlib import Path
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.db_models import Episode, Turn
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-TTS_OUTPUT_DIR = "tts_output"
+TTS_OUTPUT_DIR = settings.TTS_OUTPUT_DIR
 
 
 # ─────────────────────────────────────────────

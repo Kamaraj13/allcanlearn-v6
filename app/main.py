@@ -16,6 +16,7 @@ from app.moderator import run_roundtable
 from app.episodes import get_audio_files, add_episode, get_all_episodes
 from app.quiz_generator import generate_quiz_questions, generate_topic_description
 from app.chat import manager
+from app.config import settings
 
 load_dotenv()
 
@@ -49,7 +50,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 logger = logging.getLogger(__name__)
 
 # Create directories if they don't exist
-os.makedirs("tts_output", exist_ok=True)
+os.makedirs(settings.TTS_OUTPUT_DIR, exist_ok=True)
 
 # Mount static files — prefer build/ (React production build), fall back to app/static
 import pathlib
