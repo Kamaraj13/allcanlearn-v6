@@ -19,6 +19,14 @@ from app.chat import manager
 
 load_dotenv()
 
+# ── Database init ──────────────────────────────────────────────────────────
+from app.database import init_db
+from app.episodes import migrate_from_json
+
+init_db()          # creates tables if they don't exist
+migrate_from_json()  # imports any old JSON episodes into SQLite (safe to re-run)
+# ──────────────────────────────────────────────────────────────────────────
+
 # Use ORJSON for faster JSON serialization
 app = FastAPI(
     title="AllCanLearn",
@@ -42,7 +50,6 @@ logger = logging.getLogger(__name__)
 
 # Create directories if they don't exist
 os.makedirs("tts_output", exist_ok=True)
-os.makedirs("episodes_data", exist_ok=True)
 
 # Mount static files — prefer build/ (React production build), fall back to app/static
 import pathlib
@@ -129,15 +136,6 @@ async def catch_all(full_path: str):
     # Otherwise serve React app for client-side routing
     return FileResponse(_index_html())
 
-
-@app.get("/api/episodes/{episode_id}")
-def get_episode_details(episode_id: str):
-    """Get full episode with all turns and audio"""
-    from app.episodes import get_episode
-    episode = get_episode(episode_id)
-    if not episode:
-        raise HTTPException(status_code=404, detail="Episode not found")
-    return episode
 
 @app.get("/api/audio-files")
 def get_audio_files_list():
