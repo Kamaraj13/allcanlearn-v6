@@ -97,9 +97,11 @@ export function Layout({ audio, recentEpisodes }) {
           .sidebar-root {
             transform: translateX(-100%);
             transition: transform 0.3s ease;
+            z-index: 100 !important;
           }
-          .sidebar-root.open-mobile {
+          .sidebar-root.open {
             transform: translateX(0);
+            box-shadow: 4px 0 32px rgba(0,0,0,0.6);
           }
         }
       `}</style>
