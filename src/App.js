@@ -9,6 +9,7 @@ import EpisodeDetail from './pages/EpisodeDetail';
 import Games from './pages/Games';
 import ChatPanel from './components/Chat/ChatPanel';
 import FloatingGame from './components/Games/FloatingGame';
+import SquirrelGuide from './components/Squirrel/SquirrelGuide';
 import { useAudio } from './hooks/useAudio';
 import { useEpisodes } from './hooks/useEpisodes';
 
@@ -54,6 +55,7 @@ function AppInner() {
       {/* Floating panels — always available on every page */}
       <ChatPanel />
       <FloatingGame bottomOffset={20} />
+      <SquirrelGuide />
     </>
   );
 }
