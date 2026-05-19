@@ -1,6 +1,7 @@
 # audio_merger.py — merge all turn audio files into one continuous episode file
 # Uses ffmpeg (pre-installed on Ubuntu). Falls back gracefully if not available.
 
+from __future__ import annotations
 import os
 import subprocess
 import tempfile
