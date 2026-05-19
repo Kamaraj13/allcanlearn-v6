@@ -1,277 +1,137 @@
-# AI Roundtable
+# AllCanLearn
 
-An AI-powered panel discussion simulator that generates dynamic conversations on government jobs and exams in India using multiple distinct personas and text-to-speech synthesis.
+AI-powered podcast platform. Type any topic, get a 4-person deep-dive conversation with audio.
 
-## Overview
+Live → **allcanlearn.uk**
 
-AI Roundtable creates engaging multi-speaker discussions by orchestrating a panel of four AI characters with different perspectives:
+---
 
-- **Exam Strategist** - Strategic guidance for competitive exams
-- **Serving Officer** - Real-world insights from active government officers
-- **Fresh Qualifier** - Relatable perspective from recently selected candidates
-- **Citizen** - Critical questioning from an informed citizen perspective
+## Stack
 
-Each episode includes audio synthesis (cross-platform: macOS `say` or Linux `espeak-ng`) and JSON-formatted transcripts.
+| Layer | Tech |
+|-------|------|
+| Frontend | React 18, Framer Motion, React Router v6 |
+| Backend | FastAPI + uvicorn, Python 3.12 |
+| Database | SQLite via SQLAlchemy |
+| LLM | Groq API (LLaMA 3) |
+| TTS | Piper (local, runs on Ubuntu) |
+| Tunnel | Cloudflare Tunnel → allcanlearn.uk |
+| Server | Ubuntu machine, systemd service |
 
-## Features
-
-- ✅ Multi-character AI conversations using Groq API (LLaMA 3.1 8B)
-- ✅ Dynamic prompt engineering with conversation history
-- ✅ Cross-platform text-to-speech synthesis (macOS & Linux)
-- ✅ FastAPI endpoints for easy integration
-- ✅ Asynchronous request handling
-- ✅ Docker support for Oracle VM deployment
-- ✅ Modular, maintainable codebase
-
-## Tech Stack
-
-- **LLM**: Groq API (LLaMA 3.1 8B)
-- **Web Framework**: FastAPI + Uvicorn
-- **TTS**: macOS native `say` command (or Linux `espeak-ng`)
-- **Async Runtime**: Python asyncio
-- **HTTP Client**: httpx
-- **Containerization**: Docker & Docker Compose
+---
 
 ## Project Structure
 
 ```
-ai-roundtable/
-├── app/
-│   ├── characters.py      # Character definitions and personalities
-│   ├── groq_client.py     # Groq API integration
-│   ├── moderator.py       # Roundtable orchestration logic
-│   ├── main.py            # FastAPI application
-│   ├── tts_client.py      # Cross-platform text-to-speech client
-│   ├── schemas.py         # (Optional) Pydantic models
-│   └── requirements.txt   # Python dependencies
-├── tts_output/            # Generated audio files
-├── Dockerfile             # Docker container configuration
-├── docker-compose.yml     # Docker Compose setup
-├── setup-vm.sh           # Automated Oracle VM setup
-├── DEPLOYMENT.md         # Oracle VM deployment guide
-├── QUICKSTART.md         # Quick start guide
-├── .env.example          # Environment variables template
-├── .gitignore            # Git ignore rules
-└── README.md             # This file
+allcanlearn-v6/
+│
+├── app/                        # Python backend (FastAPI)
+│   ├── main.py                 # API routes + server entry point
+│   ├── config.py               # All settings loaded from .env
+│   ├── database.py             # SQLAlchemy engine + session
+│   ├── db_models.py            # Episode + Turn ORM models
+│   ├── episodes.py             # DB read/write for episodes
+│   ├── moderator.py            # Core: runs LLM + TTS per episode
+│   ├── groq_client.py          # Groq API calls
+│   ├── piper_tts_client.py     # Piper TTS (text → MP3)
+│   ├── characters.py           # Default speaker personas
+│   ├── *_characters.py         # Topic-specific speaker sets
+│   ├── chat.py                 # WebSocket live chat manager
+│   ├── quiz_generator.py       # Quiz generation via Groq
+│   └── static/assets/          # Background images
+│
+├── src/                        # React frontend source
+│   ├── App.js                  # Router + providers
+│   ├── pages/                  # Home, Library, CreateEpisode, EpisodeDetail
+│   ├── components/             # Layout, Games, Chat, UI primitives
+│   ├── hooks/                  # useAudio, useEpisodes, useChat
+│   └── services/api.js         # All API fetch calls
+│
+├── build/                      # React production build (served by FastAPI)
+│
+├── tts_output/                 # Generated MP3 audio files (gitignored)
+├── allcanlearn.db              # SQLite database (gitignored)
+│
+├── allcanlearn.service         # systemd unit — auto-starts on Ubuntu boot
+├── cloudflared-config.yml      # Cloudflare Tunnel config
+├── start.sh                    # Quick start script (dev)
+│
+├── .env                        # Secrets — never commit this
+├── .env.example                # Template for .env
+├── requirements.txt            # Python dependencies
+└── package.json                # Node dependencies
 ```
-
-## Installation
-
-### Prerequisites
-
-- Python 3.9+
-- Groq API key (get from https://console.groq.com)
-- For macOS: Native TTS (built-in)
-- For Linux: `espeak-ng` package
-
-### Setup Steps (Local/macOS)
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Kamaraj13/AI-Roundtable.git
-   cd AI-Roundtable
-   ```
-
-2. **Create a virtual environment**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r app/requirements.txt
-   ```
-
-4. **Configure environment variables**
-   ```bash
-   cp .env.example .env
-   ```
-   Edit `.env` and add your Groq API key:
-   ```
-   GROQ_API_KEY=your_api_key_here
-   ```
-
-5. **Run the application**
-   ```bash
-   uvicorn app.main:app --reload
-   ```
-
-The API will be available at `http://localhost:8000`
-
-### Setup Steps (Oracle VM - Ubuntu 22.04 aarch64)
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for complete Oracle VM setup instructions.
-
-Quick setup:
-```bash
-git clone https://github.com/Kamaraj13/AI-Roundtable.git
-cd AI-Roundtable
-chmod +x setup-vm.sh
-./setup-vm.sh
-nano .env  # Add GROQ_API_KEY
-```
-
-## API Endpoints
-
-### Health Check
-```
-GET /
-```
-Response: `{"status": "ok"}`
-
-### Generate Roundtable Episode
-```
-POST /generate?tts=true
-```
-
-**Query Parameters:**
-- `tts` (bool, default: true) - Enable text-to-speech synthesis
-
-**Response:**
-```json
-{
-  "topic": "Government Jobs and Exams in India",
-  "turns": [
-    {
-      "speaker": "Moderator",
-      "message": "Welcome to the AI Roundtable...",
-      "tts": null
-    },
-    {
-      "speaker": "Exam Strategist",
-      "message": "Thank you for having us...",
-      "tts": "tts_output/1769291536494.aiff"
-    }
-  ]
-}
-```
-
-## Usage Examples
-
-### cURL
-```bash
-# Health check
-curl http://localhost:8000/
-
-# Generate without TTS
-curl -X POST http://localhost:8000/generate?tts=false
-
-# Generate with TTS
-curl -X POST http://localhost:8000/generate?tts=true
-```
-
-### Python
-```python
-import httpx
-import asyncio
-
-async def main():
-    async with httpx.AsyncClient() as client:
-        response = await client.post("http://localhost:8000/generate?tts=true")
-        episode = response.json()
-        print(episode)
-
-asyncio.run(main())
-```
-
-## Configuration
-
-### Adjusting Conversation Turns
-Edit `app/moderator.py`:
-```python
-MAX_TURNS = 6  # Change this to control conversation length
-```
-
-### Changing the Topic
-Edit `app/moderator.py`:
-```python
-TOPIC = "Your custom topic here"
-```
-
-### Adding New Characters
-Edit `app/characters.py` and add to the `CHARACTERS` list, then update the system prompt in `moderator.py`.
-
-## Deployment
-
-### Docker (Linux/Oracle VM)
-```bash
-docker-compose up --build
-```
-
-### Manual Setup (Ubuntu 22.04)
-```bash
-chmod +x setup-vm.sh
-./setup-vm.sh
-```
-
-### Production with Supervisor
-See [DEPLOYMENT.md](DEPLOYMENT.md) for full instructions.
-
-## Troubleshooting
-
-### "GROQ_API_KEY not set"
-```bash
-# Verify .env exists and has the key
-cat .env
-
-# Make sure python-dotenv is installed
-pip install python-dotenv
-```
-
-### JSON parsing errors from Groq
-- Groq occasionally returns malformed JSON
-- The app has built-in retry/recovery logic
-- Check `app/moderator.py:parse_responses()` for details
-
-### TTS not generating audio files
-- **macOS**: Verify `say` command works: `say "test"`
-- **Linux**: Verify espeak-ng: `espeak-ng -v en-in -w test.wav "test"`
-- Check file permissions in `tts_output/` directory
-
-### Port 8000 already in use
-```bash
-lsof -i :8000
-kill -9 <PID>
-```
-
-## Platform Compatibility
-
-| Feature | macOS | Linux | Docker |
-|---------|-------|-------|--------|
-| FastAPI | ✅ | ✅ | ✅ |
-| Groq API | ✅ | ✅ | ✅ |
-| TTS | ✅ (say) | ✅ (espeak-ng) | ✅ (espeak-ng) |
-| Docker | ✅ | ✅ | ✅ |
-| aarch64 Support | ❌ | ✅ | ✅ |
-
-## Next Steps
-
-- [ ] Test locally
-- [ ] Deploy to Oracle VM
-- [ ] Add custom topics
-- [ ] Create web UI
-- [ ] Setup monitoring
-- [ ] Add rate limiting
-- [ ] Implement user authentication
-
-## Documentation
-
-- **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Oracle VM deployment guide
-- **[GIT_SETUP.md](GIT_SETUP.md)** - Git configuration
-- **[TODO.md](TODO.md)** - Setup checklist
-
-## License
-
-MIT
-
-## Contact & Support
-
-For issues or questions, check the documentation files or open an issue on GitHub.
 
 ---
 
-**Built with ❤️ for Indian government exam aspirants**
+## Quick Start
 
-Currently running on: Ubuntu 22.04 aarch64 (Oracle VM)
+```bash
+# 1. Clone
+git clone https://github.com/Kamaraj13/allcanlearn-v6.git
+cd allcanlearn-v6
+
+# 2. Configure
+cp .env.example .env
+# Edit .env and add your GROQ_API_KEY
+
+# 3. Install Python deps
+pip install -r requirements.txt
+
+# 4. Install + build React
+npm install && npm run build
+
+# 5. Run
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Or just:
+```bash
+./start.sh
+```
+
+---
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/episodes` | List all episodes |
+| GET | `/api/episodes/{id}` | Full episode with all turns |
+| POST | `/generate?topic=...` | Generate a new episode |
+| GET | `/api/topics/popular` | Browse topic categories |
+| WS | `/ws/chat?username=...` | Live group chat |
+
+---
+
+## Deploy on Ubuntu (Production)
+
+```bash
+# On Ubuntu machine
+git clone https://github.com/Kamaraj13/allcanlearn-v6.git
+cd allcanlearn-v6
+pip install -r requirements.txt
+cp .env.example .env && nano .env   # add GROQ_API_KEY
+
+# Install as system service
+sudo cp allcanlearn.service /etc/systemd/system/
+sudo systemctl enable allcanlearn
+sudo systemctl start allcanlearn
+
+# Start Cloudflare tunnel
+cloudflared tunnel run allcanlearn
+```
+
+---
+
+## Environment Variables
+
+See `.env.example` for the full list. Key ones:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GROQ_API_KEY` | — | Required. Get from console.groq.com |
+| `DATABASE_URL` | `sqlite:///allcanlearn.db` | SQLite or PostgreSQL |
+| `TTS_OUTPUT_DIR` | `tts_output` | Where MP3 files are saved |
+| `MAX_TURNS` | `8` | Dialogue turns per episode |
+| `MAX_ESSENTIAL_TURNS` | `16` | Turns for deep-dive episodes |
