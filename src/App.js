@@ -8,6 +8,7 @@ import CreateEpisode from './pages/CreateEpisode';
 import EpisodeDetail from './pages/EpisodeDetail';
 import Games from './pages/Games';
 import ChatPanel from './components/Chat/ChatPanel';
+import FloatingGame from './components/Games/FloatingGame';
 import { useAudio } from './hooks/useAudio';
 import { useEpisodes } from './hooks/useEpisodes';
 
@@ -50,8 +51,9 @@ function AppInner() {
         </Route>
       </Routes>
 
-      {/* Floating chat panel — always available */}
+      {/* Floating panels — always available on every page */}
       <ChatPanel />
+      <FloatingGame bottomOffset={20} />
     </>
   );
 }

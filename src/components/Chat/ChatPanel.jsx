@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, X, Minus, Send, Wifi, WifiOff } from 'lucide-react';
+import { MessageCircle, X, Minus, Send, Wifi, WifiOff, GripHorizontal } from 'lucide-react';
 import { useChat } from '../../hooks/useChat';
 
 const STORAGE_KEY = 'acl_chat_username';
@@ -160,6 +160,9 @@ export function ChatPanel() {
       <AnimatePresence>
         {open && (
           <motion.div
+            drag
+            dragMomentum={false}
+            dragElastic={0}
             initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -179,6 +182,7 @@ export function ChatPanel() {
               overflow: 'hidden',
               boxShadow: '0 8px 48px rgba(0,0,0,0.6)',
               transition: 'height 0.25s ease',
+              userSelect: 'none',
             }}
           >
             {/* Header */}
@@ -190,8 +194,10 @@ export function ChatPanel() {
               borderBottom: minimized ? 'none' : '1px solid var(--border)',
               background: 'var(--surface2)',
               flexShrink: 0,
+              cursor: 'grab',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <GripHorizontal size={14} color="var(--muted)" style={{ flexShrink: 0 }} />
                 <MessageCircle size={16} color="var(--accent)" />
                 <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>Live Chat</span>
                 {connected
