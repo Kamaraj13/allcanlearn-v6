@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Download, Play, Pause, Calendar,
-  Users, Zap, Volume2
+  Users, Zap, Volume2, Gamepad2, X
 } from 'lucide-react';
 import { useEpisode } from '../hooks/useEpisodes';
 import { topicGradientCss } from '../services/api';
@@ -157,6 +157,7 @@ export function EpisodeDetail({ audio }) {
   const navigate = useNavigate();
   const { episode, loading, error } = useEpisode(id);
   const activeRef = useRef(null);
+  const [gameOpen, setGameOpen] = useState(false);
 
   // Load audio when episode is ready
   // Prefer single merged file — feels like one continuous conversation.
@@ -294,16 +295,8 @@ export function EpisodeDetail({ audio }) {
           Back
         </button>
 
-        {/* Two column layout */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 380px',
-          gap: '36px',
-          alignItems: 'start',
-        }}
-        className="episode-grid"
-        >
-          {/* ── Left column ─────────────────────────── */}
+        {/* Single column — full width transcript */}
+        <div style={{ maxWidth: '780px' }}>
           <div>
             {/* Episode header */}
             <motion.div
@@ -468,35 +461,83 @@ export function EpisodeDetail({ audio }) {
             </div>
           </div>
 
-          {/* ── Right column (sticky) ────────────────── */}
-          <div style={{
-            position: 'sticky',
-            top: '24px',
-          }}>
-            <h2 style={{
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              color: 'var(--muted)',
-              marginBottom: '12px',
-            }}>
-              Take a Break
-            </h2>
-            <GamePanel />
-          </div>
         </div>
       </div>
 
+      {/* ── Floating game button ─────────────────────────────── */}
+      <motion.button
+        whileHover={{ scale: 1.08 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={() => setGameOpen(o => !o)}
+        title="Play a game while you listen"
+        style={{
+          position: 'fixed',
+          bottom: audio?.currentTrack ? '100px' : '32px',
+          right: '32px',
+          width: '56px',
+          height: '56px',
+          borderRadius: '50%',
+          background: gameOpen ? 'var(--surface3)' : 'var(--gradient)',
+          border: '1px solid var(--border)',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          zIndex: 100,
+          transition: 'bottom 0.3s',
+        }}
+      >
+        {gameOpen ? <X size={22} /> : <Gamepad2 size={22} />}
+      </motion.button>
+
+      {/* ── Slide-in game drawer ─────────────────────────────── */}
+      <AnimatePresence>
+        {gameOpen && (
+          <motion.div
+            initial={{ x: '100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              width: '380px',
+              height: '100vh',
+              background: 'var(--surface)',
+              borderLeft: '1px solid var(--border)',
+              zIndex: 99,
+              overflowY: 'auto',
+              padding: '24px 20px',
+              paddingBottom: audio?.currentTrack ? '100px' : '24px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
+                <Gamepad2 size={18} color="var(--accent)" />
+                Take a Break
+              </div>
+              <button
+                onClick={() => setGameOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <GamePanel />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <style>{`
-        @media (max-width: 900px) {
-          .episode-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
         @keyframes pulse {
           0%,100% { opacity: 1; }
           50%      { opacity: 0.4; }
+        }
+        @media (max-width: 600px) {
+          /* game drawer full width on mobile */
         }
       `}</style>
     </div>

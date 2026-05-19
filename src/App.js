@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Library from './pages/Library';
 import CreateEpisode from './pages/CreateEpisode';
 import EpisodeDetail from './pages/EpisodeDetail';
+import Games from './pages/Games';
 import ChatPanel from './components/Chat/ChatPanel';
 import { useAudio } from './hooks/useAudio';
 import { useEpisodes } from './hooks/useEpisodes';
@@ -43,6 +44,7 @@ function AppInner() {
             path="/episode/:id"
             element={<EpisodeDetail audio={audio} />}
           />
+          <Route path="/games" element={<Games />} />
           {/* Catch-all → home */}
           <Route path="*" element={<Home onPlay={handlePlay} />} />
         </Route>

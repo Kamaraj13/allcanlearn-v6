@@ -7,17 +7,12 @@ import { topicGradientCss } from '../../services/api';
 const navItems = [
   { to: '/',        label: 'Home',           icon: Home },
   { to: '/library', label: 'My Library',     icon: Library },
-  { to: '/create',  label: 'Create Episode', icon: Plus,      accent: true },
-  { to: '/quiz',    label: 'Quiz',           icon: Gamepad2,  quiz: true },
+  { to: '/create',  label: 'Create Episode', icon: Plus,     accent: true },
+  { to: '/games',   label: 'Games',          icon: Gamepad2 },
 ];
 
 export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
   const navigate = useNavigate();
-
-  const handleQuiz = (e) => {
-    e.preventDefault();
-    window.location.href = '/quiz';
-  };
 
   return (
     <>
@@ -118,34 +113,7 @@ export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
 
         {/* Nav */}
         <nav style={{ padding: '16px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {navItems.map(({ to, label, icon: Icon, accent, quiz }) => {
-            if (quiz) {
-              return (
-                <a
-                  key={to}
-                  href="/quiz"
-                  onClick={handleQuiz}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '10px 12px',
-                    borderRadius: '8px',
-                    fontSize: '0.875rem',
-                    fontWeight: 600,
-                    color: '#fff',
-                    background: 'var(--gradient)',
-                    textDecoration: 'none',
-                    transition: 'all 0.2s ease',
-                    boxShadow: '0 2px 12px rgba(124,58,237,0.3)',
-                  }}
-                >
-                  <Icon size={18} />
-                  {label}
-                </a>
-              );
-            }
-
+          {navItems.map(({ to, label, icon: Icon, accent }) => {
             return (
               <NavLink
                 key={to}
