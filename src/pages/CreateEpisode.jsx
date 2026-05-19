@@ -1,16 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Sparkles, Users, CheckCircle, Loader, ArrowRight } from 'lucide-react';
-import { generateEpisode } from '../services/api';
+import { Mic, Sparkles, Users, ArrowRight, Volume2, CheckCircle } from 'lucide-react';
 import { useToast } from '../components/UI/Toast';
-
-const STEPS = [
-  { id: 'assemble',  label: 'Assembling panel',      icon: Users },
-  { id: 'dialogue', label: 'Writing dialogue',        icon: Mic },
-  { id: 'voices',   label: 'Synthesising voices',     icon: Sparkles },
-  { id: 'done',     label: 'Done!',                   icon: CheckCircle },
-];
 
 const EXAMPLES = [
   'Why does inflation happen and who does it hurt most?',
@@ -18,470 +10,346 @@ const EXAMPLES = [
   'What would a Universal Basic Income actually look like?',
   'Is nuclear energy the answer to climate change?',
   'How do social media algorithms shape our beliefs?',
+  'Why do we dream, and what do dreams mean?',
+  'How will AI change the job market in 10 years?',
 ];
 
-const CHARACTERS = [
-  { name: 'The Expert',      role: 'Deep domain knowledge', color: '#7C3AED', emoji: '🧑‍🎓' },
-  { name: 'The Skeptic',     role: 'Questions everything',  color: '#EC4899', emoji: '🤨' },
-  { name: 'The Optimist',    role: 'Bright-side thinker',   color: '#10B981', emoji: '😊' },
-  { name: 'The Pragmatist',  role: 'Practical solutions',   color: '#F59E0B', emoji: '🛠️' },
+const PANEL = [
+  { name: 'The Expert',      emoji: '🧑‍🎓', color: '#7C3AED', role: 'Facts & research' },
+  { name: 'The Skeptic',     emoji: '🤨',   color: '#EC4899', role: 'Questions everything' },
+  { name: 'The Optimist',    emoji: '😊',   color: '#10B981', role: 'Bright-side thinker' },
+  { name: 'The Pragmatist',  emoji: '🛠️',   color: '#F59E0B', role: 'Real-world focus' },
 ];
 
-function CharacterCard({ char, topic, delay }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay, duration: 0.35 }}
-      style={{
-        background: 'var(--surface2)',
-        border: '1px solid var(--border)',
-        borderRadius: '14px',
-        padding: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '10px',
-        textAlign: 'center',
-        transition: 'border-color 0.2s',
-        flex: '1 1 140px',
-        minWidth: '130px',
-      }}
-      whileHover={{ borderColor: char.color, scale: 1.02 }}
-    >
-      {/* Avatar circle */}
-      <div style={{
-        width: '56px',
-        height: '56px',
-        borderRadius: '50%',
-        background: `${char.color}22`,
-        border: `2px solid ${char.color}44`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: '1.75rem',
-      }}>
-        {char.emoji}
-      </div>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text)' }}>{char.name}</div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '2px' }}>{char.role}</div>
-      </div>
-      {topic && (
-        <div style={{
-          fontSize: '0.7rem',
-          color: char.color,
-          background: `${char.color}15`,
-          padding: '3px 8px',
-          borderRadius: '999px',
-          fontWeight: 600,
-        }}>
-          Ready
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-function StepIndicator({ step, currentStep }) {
-  const Icon = step.icon;
-  const isDone    = STEPS.indexOf(step) < STEPS.indexOf(STEPS.find(s => s.id === currentStep));
-  const isCurrent = step.id === currentStep;
-
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: '10px',
-      padding: '10px 0',
-      opacity: isDone || isCurrent ? 1 : 0.3,
-      transition: 'opacity 0.3s',
-    }}>
-      <div style={{
-        width: '32px',
-        height: '32px',
-        borderRadius: '50%',
-        background: isDone
-          ? 'rgba(16,185,129,0.2)'
-          : isCurrent
-            ? 'rgba(124,58,237,0.2)'
-            : 'var(--surface3)',
-        border: `2px solid ${isDone ? 'var(--green)' : isCurrent ? 'var(--accent)' : 'var(--border)'}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        transition: 'all 0.3s',
-      }}>
-        {isCurrent && !isDone
-          ? <Loader size={14} color="var(--accent)" style={{ animation: 'spin 0.8s linear infinite' }} />
-          : <Icon size={14} color={isDone ? 'var(--green)' : isCurrent ? 'var(--accent)' : 'var(--muted)'} />
-        }
-      </div>
-      <span style={{
-        fontSize: '0.875rem',
-        fontWeight: 600,
-        color: isDone ? 'var(--green)' : isCurrent ? 'var(--text)' : 'var(--muted)',
-        transition: 'color 0.3s',
-      }}>
-        {step.label}
-      </span>
-    </div>
-  );
-}
+const SPEAKER_COLORS = {
+  'The Expert':     '#7C3AED',
+  'The Skeptic':    '#EC4899',
+  'The Optimist':   '#10B981',
+  'The Pragmatist': '#F59E0B',
+};
 
 export function CreateEpisode({ onEpisodeCreated }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const textareaRef = useRef(null);
+  const readerRef = useRef(null);       // holds the SSE reader so we can cancel
+  const audioRef = useRef(new Audio()); // local audio for streaming playback
+  const turnQueueRef = useRef([]);      // audio URLs queued for playback
+  const playingRef = useRef(false);
 
   const [topic, setTopic] = useState(searchParams.get('topic') || '');
   const [generating, setGenerating] = useState(false);
-  const [currentStep, setCurrentStep] = useState(null);
-  const [progress, setProgress] = useState(0);
+  const [streamTurns, setStreamTurns] = useState([]);   // turns received so far
+  const [totalExpected] = useState(32);                 // 8 rounds × 4 speakers
+  const [episodeId, setEpisodeId] = useState(null);
+  const [done, setDone] = useState(false);
   const [exampleIndex, setExampleIndex] = useState(0);
+  const [currentSpeaker, setCurrentSpeaker] = useState(null);
 
-  // Rotate placeholder examples
+  // Rotate placeholder
   useEffect(() => {
-    const interval = setInterval(() => {
-      setExampleIndex(i => (i + 1) % EXAMPLES.length);
-    }, 3200);
-    return () => clearInterval(interval);
+    const id = setInterval(() => setExampleIndex(i => (i + 1) % EXAMPLES.length), 3200);
+    return () => clearInterval(id);
   }, []);
 
-  // Auto-fill topic from URL
+  // Auto-fill from URL
   useEffect(() => {
     const t = searchParams.get('topic');
     if (t) setTopic(t);
   }, [searchParams]);
 
-  const handleGenerate = async () => {
-    if (!topic.trim()) {
-      textareaRef.current?.focus();
+  // Audio queue player — plays each track as it arrives, auto-advances
+  const playNext = useCallback(() => {
+    if (turnQueueRef.current.length === 0) {
+      playingRef.current = false;
       return;
     }
+    const { url, speaker } = turnQueueRef.current.shift();
+    setCurrentSpeaker(speaker);
+    playingRef.current = true;
+    const audio = audioRef.current;
+    audio.src = url;
+    audio.onended = playNext;
+    audio.onerror = playNext;  // skip broken files
+    audio.play().catch(playNext);
+  }, []);
+
+  const queueAudio = useCallback((url, speaker) => {
+    turnQueueRef.current.push({ url, speaker });
+    if (!playingRef.current) playNext();
+  }, [playNext]);
+
+  // Stop audio on unmount
+  useEffect(() => {
+    return () => {
+      audioRef.current.pause();
+      if (readerRef.current) readerRef.current.cancel();
+    };
+  }, []);
+
+  const handleGenerate = async () => {
+    if (!topic.trim()) { textareaRef.current?.focus(); return; }
+
     setGenerating(true);
-    setCurrentStep(STEPS[0].id);
-    setProgress(0);
-
-    // Simulate step progression
-    const stepDurations = [8000, 20000, 25000, 2000]; // rough ms per step
-    const totalDuration = stepDurations.reduce((a, b) => a + b, 0);
-
-    const stepTimers = STEPS.map((step, i) => {
-      const delay = stepDurations.slice(0, i).reduce((a, b) => a + b, 0);
-      return setTimeout(() => {
-        setCurrentStep(step.id);
-      }, delay);
-    });
-
-    // Progress bar
-    const startTime = Date.now();
-    const progressInterval = setInterval(() => {
-      const e = Date.now() - startTime;
-      setProgress(Math.min(95, (e / totalDuration) * 100));
-    }, 200);
+    setStreamTurns([]);
+    setEpisodeId(null);
+    setDone(false);
+    setCurrentSpeaker(null);
+    turnQueueRef.current = [];
+    playingRef.current = false;
 
     try {
-      const data = await generateEpisode(topic.trim());
-      clearInterval(progressInterval);
-      stepTimers.forEach(clearTimeout);
-      setCurrentStep('done');
-      setProgress(100);
+      const response = await fetch(
+        `/generate/stream?topic=${encodeURIComponent(topic.trim())}`,
+        { method: 'POST' }
+      );
 
-      setTimeout(() => {
-        setGenerating(false);
-        if (data?.episode_id || data?.id) {
-          const id = data.episode_id || data.id;
-          onEpisodeCreated?.();
-          navigate(`/episode/${id}`);
-        } else {
-          // Try to get newest episode
-          onEpisodeCreated?.();
-          navigate('/library');
+      if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+      const reader = response.body.getReader();
+      readerRef.current = reader;
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done: streamDone, value } = await reader.read();
+        if (streamDone) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();  // keep any incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            const event = JSON.parse(line.slice(6));
+
+            if (event.type === 'turn') {
+              setStreamTurns(prev => [...prev, event]);
+              if (event.audio_url) queueAudio(event.audio_url, event.speaker);
+            }
+
+            if (event.type === 'done') {
+              setEpisodeId(event.episode_id);
+              setDone(true);
+              onEpisodeCreated?.();
+            }
+
+            if (event.type === 'error') {
+              throw new Error(event.message);
+            }
+          } catch (parseErr) {
+            // ignore malformed SSE lines
+          }
         }
-        toast.success('Episode created successfully!');
-      }, 1200);
+      }
     } catch (err) {
-      clearInterval(progressInterval);
-      stepTimers.forEach(clearTimeout);
+      toast.error('Generation failed — please try again.');
       setGenerating(false);
-      setCurrentStep(null);
-      setProgress(0);
-      toast.error('Failed to generate episode. Please try again.');
     }
   };
 
+  const handleGoToEpisode = () => {
+    audioRef.current.pause();
+    navigate(`/episode/${episodeId}`);
+  };
+
+  const progress = Math.round((streamTurns.length / totalExpected) * 100);
+
   return (
-    <div style={{ minHeight: '100vh', padding: '48px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ width: '100%', maxWidth: '680px' }}>
+    <div style={{ minHeight: '100vh', padding: '48px 24px', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ width: '100%', maxWidth: '700px' }}>
+
         {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          style={{ marginBottom: '40px' }}
-        >
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: '40px' }}>
           <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            padding: '4px 12px',
-            borderRadius: '999px',
-            background: 'rgba(124,58,237,0.15)',
-            border: '1px solid rgba(124,58,237,0.3)',
-            fontSize: '0.75rem',
-            fontWeight: 600,
-            color: 'var(--accent)',
-            marginBottom: '16px',
-            letterSpacing: '0.04em',
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            padding: '4px 12px', borderRadius: '999px',
+            background: 'rgba(124,58,237,0.15)', border: '1px solid rgba(124,58,237,0.3)',
+            fontSize: '0.75rem', fontWeight: 600, color: 'var(--accent)',
+            marginBottom: '16px', letterSpacing: '0.04em',
           }}>
-            <Sparkles size={12} />
-            AI PODCAST GENERATOR
+            <Sparkles size={12} /> AI PODCAST GENERATOR
           </div>
-          <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>
-            Create a New Episode
-          </h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: 900, marginBottom: '8px' }}>Create a New Episode</h1>
           <p style={{ color: 'var(--muted)', fontSize: '1rem', lineHeight: 1.6 }}>
-            Enter any topic and 4 AI experts will discuss it in depth — with real voices.
+            Enter any topic. 4 AI experts debate it — you hear audio within 10 seconds.
           </p>
         </motion.div>
 
-        {/* Step 1: Topic input */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border-h)',
-            borderRadius: '20px',
-            padding: '32px',
-            marginBottom: '24px',
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '20px',
-          }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              background: 'var(--gradient)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              color: '#fff',
-            }}>1</div>
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Choose a Topic</span>
-          </div>
+        {/* Topic input — hide when generating */}
+        <AnimatePresence>
+          {!generating && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, height: 0 }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: '20px', padding: '32px', marginBottom: '24px' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
+                <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'var(--gradient)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#fff' }}>1</div>
+                <span style={{ fontWeight: 700 }}>Choose a Topic</span>
+              </div>
 
-          <textarea
-            ref={textareaRef}
-            value={topic}
-            onChange={e => setTopic(e.target.value)}
-            disabled={generating}
-            rows={4}
-            placeholder={EXAMPLES[exampleIndex]}
-            style={{
-              width: '100%',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border-h)',
-              borderRadius: '12px',
-              color: 'var(--text)',
-              padding: '16px',
-              fontSize: '1rem',
-              lineHeight: 1.6,
-              resize: 'vertical',
-              minHeight: '100px',
-              transition: 'border-color 0.2s, box-shadow 0.2s',
-            }}
-            onFocus={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.boxShadow = 'var(--glow)'; }}
-            onBlur={e => { e.target.style.borderColor = 'var(--border-h)'; e.target.style.boxShadow = 'none'; }}
-          />
-
-          <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: '8px' }}>
-            Be specific for better results. You can ask a question or state a topic.
-          </div>
-        </motion.div>
-
-        {/* Step 2: Panel preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border-h)',
-            borderRadius: '20px',
-            padding: '32px',
-            marginBottom: '24px',
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginBottom: '20px',
-          }}>
-            <div style={{
-              width: '28px',
-              height: '28px',
-              borderRadius: '50%',
-              background: 'var(--surface3)',
-              border: '2px solid var(--border-h)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.75rem',
-              fontWeight: 800,
-              color: 'var(--muted)',
-            }}>2</div>
-            <span style={{ fontWeight: 700, fontSize: '1rem' }}>Your AI Panel</span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            {CHARACTERS.map((char, i) => (
-              <CharacterCard
-                key={char.name}
-                char={char}
-                topic={topic.trim()}
-                delay={i * 0.06}
+              <textarea
+                ref={textareaRef}
+                value={topic}
+                onChange={e => setTopic(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleGenerate(); }}
+                rows={3}
+                placeholder={EXAMPLES[exampleIndex]}
+                style={{
+                  width: '100%', background: 'var(--surface2)', border: '1px solid var(--border-h)',
+                  borderRadius: '12px', color: 'var(--text)', padding: '16px',
+                  fontSize: '1rem', lineHeight: 1.6, resize: 'vertical', minHeight: '90px',
+                }}
+                onFocus={e => { e.target.style.borderColor = 'var(--accent)'; }}
+                onBlur={e => { e.target.style.borderColor = 'var(--border-h)'; }}
               />
+              <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: '8px' }}>
+                Tip: Cmd+Enter to generate
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Panel preview — always visible */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+          style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: '20px', padding: '24px', marginBottom: '24px' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+            <Users size={16} color="var(--accent)" />
+            <span style={{ fontWeight: 700 }}>Your Panel</span>
+            {currentSpeaker && (
+              <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: SPEAKER_COLORS[currentSpeaker] || 'var(--accent)' }}>
+                <Volume2 size={14} /> {currentSpeaker} is speaking
+              </span>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+            {PANEL.map(p => (
+              <motion.div
+                key={p.name}
+                animate={{ borderColor: currentSpeaker === p.name ? p.color : 'transparent', scale: currentSpeaker === p.name ? 1.04 : 1 }}
+                style={{
+                  flex: '1 1 130px', minWidth: '120px', padding: '14px',
+                  background: 'var(--surface2)', border: `2px solid ${currentSpeaker === p.name ? p.color : 'var(--border)'}`,
+                  borderRadius: '14px', textAlign: 'center',
+                  transition: 'border-color 0.2s',
+                }}
+              >
+                <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>{p.emoji}</div>
+                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: 'var(--text)' }}>{p.name}</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--muted)', marginTop: '2px' }}>{p.role}</div>
+              </motion.div>
             ))}
           </div>
-
-          {topic.trim() && (
-            <div style={{
-              marginTop: '16px',
-              padding: '12px 16px',
-              background: 'rgba(124,58,237,0.08)',
-              borderRadius: '10px',
-              border: '1px solid rgba(124,58,237,0.2)',
-              fontSize: '0.8125rem',
-              color: 'var(--muted)',
-              lineHeight: 1.5,
-            }}>
-              <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Topic matched!</span>{' '}
-              These 4 experts will discuss "<em style={{ color: 'var(--text)' }}>{topic.trim()}</em>" from their unique perspectives.
-            </div>
-          )}
         </motion.div>
 
         {/* Generate button */}
         {!generating && (
           <motion.button
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
             whileHover={topic.trim() ? { scale: 1.02 } : {}}
             whileTap={topic.trim() ? { scale: 0.98 } : {}}
             onClick={handleGenerate}
             disabled={!topic.trim()}
             style={{
-              width: '100%',
-              padding: '18px',
-              borderRadius: '14px',
+              width: '100%', padding: '18px', borderRadius: '14px',
               background: topic.trim() ? 'var(--gradient)' : 'var(--surface2)',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: '1.0625rem',
-              border: 'none',
-              cursor: topic.trim() ? 'pointer' : 'not-allowed',
+              color: '#fff', fontWeight: 800, fontSize: '1.0625rem',
+              border: 'none', cursor: topic.trim() ? 'pointer' : 'not-allowed',
               opacity: topic.trim() ? 1 : 0.5,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
               boxShadow: topic.trim() ? '0 4px 24px rgba(124,58,237,0.4)' : 'none',
-              transition: 'all 0.2s',
             }}
           >
-            <Sparkles size={20} />
-            Generate Episode
-            <ArrowRight size={18} />
+            <Sparkles size={20} /> Generate Episode <ArrowRight size={18} />
           </motion.button>
         )}
 
-        {/* Generating state */}
+        {/* Live stream view */}
         <AnimatePresence>
           {generating && (
             <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border-h)',
-                borderRadius: '20px',
-                padding: '32px',
-                overflow: 'hidden',
-              }}
+              initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: '20px', padding: '28px', marginTop: '16px' }}
             >
+              {/* Progress bar */}
               <div style={{ marginBottom: '20px' }}>
-                <div style={{
-                  fontWeight: 700,
-                  fontSize: '1rem',
-                  marginBottom: '8px',
-                }}>
-                  Creating your episode…
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                    {done ? '✅ Episode ready!' : streamTurns.length === 0 ? 'Starting up…' : `${streamTurns.length} turns generated`}
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{progress}%</span>
                 </div>
-                <div style={{
-                  height: '6px',
-                  background: 'var(--surface3)',
-                  borderRadius: '3px',
-                  overflow: 'hidden',
-                }}>
+                <div style={{ height: '6px', background: 'var(--surface3)', borderRadius: '3px', overflow: 'hidden' }}>
                   <motion.div
                     animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.3 }}
-                    style={{
-                      height: '100%',
-                      background: 'var(--gradient)',
-                      borderRadius: '3px',
-                    }}
+                    transition={{ duration: 0.4 }}
+                    style={{ height: '100%', background: 'var(--gradient)', borderRadius: '3px' }}
                   />
                 </div>
-                <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--muted)', marginTop: '4px' }}>
-                  {Math.round(progress)}%
-                </div>
+                {streamTurns.length === 0 && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '8px' }}>
+                    ⏳ First audio arrives in ~10 seconds…
+                  </div>
+                )}
+                {streamTurns.length > 0 && !done && (
+                  <div style={{ fontSize: '0.8rem', color: 'var(--accent)', marginTop: '8px' }}>
+                    🎧 Playing live — more turns loading in the background
+                  </div>
+                )}
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {STEPS.map(step => (
-                  <StepIndicator key={step.id} step={step} currentStep={currentStep} />
-                ))}
+              {/* Live transcript */}
+              <div style={{ maxHeight: '320px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <AnimatePresence>
+                  {streamTurns.map((turn, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{
+                        padding: '12px 14px',
+                        background: 'var(--surface2)',
+                        borderRadius: '12px',
+                        borderLeft: `3px solid ${SPEAKER_COLORS[turn.speaker] || 'var(--accent)'}`,
+                      }}
+                    >
+                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: SPEAKER_COLORS[turn.speaker] || 'var(--accent)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {turn.speaker}
+                        {turn.audio_url && <Volume2 size={11} />}
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.5 }}>{turn.message}</div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
 
-              <div style={{
-                marginTop: '20px',
-                padding: '12px 16px',
-                background: 'rgba(124,58,237,0.08)',
-                borderRadius: '10px',
-                fontSize: '0.8125rem',
-                color: 'var(--muted)',
-              }}>
-                This usually takes 2–3 minutes. Hang tight — we're crafting something great for you!
-              </div>
+              {/* Done — go to episode */}
+              {done && episodeId && (
+                <motion.button
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  onClick={handleGoToEpisode}
+                  style={{
+                    marginTop: '20px', width: '100%', padding: '16px',
+                    borderRadius: '12px', background: 'var(--gradient)',
+                    color: '#fff', fontWeight: 800, fontSize: '1rem',
+                    border: 'none', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                    boxShadow: '0 4px 24px rgba(124,58,237,0.4)',
+                  }}
+                >
+                  <CheckCircle size={18} /> Open Full Episode
+                </motion.button>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
-        @media (max-width: 768px) {
-          /* padding handled inline */
-        }
-      `}</style>
+      </div>
     </div>
   );
 }

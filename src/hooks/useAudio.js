@@ -77,6 +77,21 @@ export function useAudio() {
     setDuration(0);
   }, []);
 
+  // Append a single track while streaming — auto-plays if it's the first one
+  const appendTrack = useCallback((track) => {
+    setTracks(prev => {
+      const updated = [...prev, track];
+      // If this is the very first track, start playing immediately
+      if (prev.length === 0 && track.src) {
+        const audio = audioRef.current;
+        audio.src = track.src;
+        audio.load();
+        audio.play().catch(() => {});
+      }
+      return updated;
+    });
+  }, []);
+
   const play = useCallback(() => {
     audioRef.current.play().catch(() => {});
   }, []);
@@ -128,6 +143,7 @@ export function useAudio() {
     currentTime,
     volume,
     loadTracks,
+    appendTrack,
     play,
     pause,
     togglePlay,

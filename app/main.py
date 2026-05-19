@@ -4,7 +4,7 @@ import os
 import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, ORJSONResponse
+from fastapi.responses import FileResponse, ORJSONResponse, StreamingResponse
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import WebSocket, WebSocketDisconnect
 from datetime import datetime
-from app.moderator import run_roundtable
+from app.moderator import run_roundtable, run_roundtable_streaming
 from app.episodes import get_audio_files, add_episode, get_all_episodes
 from app.quiz_generator import generate_quiz_questions, generate_topic_description
 from app.chat import manager
@@ -106,6 +106,52 @@ async def generate(tts: bool = True, topic: str = "government_jobs", essential: 
     except Exception as e:
         logger.error(f"Error generating episode: {str(e)}", exc_info=True)
         raise
+
+
+@app.post("/generate/stream")
+async def generate_stream(topic: str = ""):
+    """
+    Stream episode generation turn-by-turn using Server-Sent Events (SSE).
+    Frontend receives each turn as soon as its audio is ready (~10 sec for first turn).
+    """
+    import json as _json
+
+    if not topic.strip():
+        raise HTTPException(status_code=400, detail="Topic is required")
+
+    async def event_stream():
+        all_turns = []
+        episode_id = None
+
+        try:
+            async for turn in run_roundtable_streaming(topic.strip()):
+                all_turns.append(turn)
+                payload = {
+                    "type":       "turn",
+                    "turn_index": turn["turn_index"],
+                    "speaker":    turn["speaker"],
+                    "message":    turn["message"],
+                    "audio_url":  f"/tts_output/{turn['tts']}" if turn.get("tts") else None,
+                }
+                yield f"data: {_json.dumps(payload)}\n\n"
+
+            # All turns done — save to DB
+            episode_id = add_episode(topic.strip(), all_turns)
+            yield f"data: {_json.dumps({'type': 'done', 'episode_id': episode_id})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}", exc_info=True)
+            yield f"data: {_json.dumps({'type': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control":    "no-cache",
+            "X-Accel-Buffering": "no",   # stops nginx/cloudflare buffering the stream
+            "Connection":       "keep-alive",
+        },
+    )
 
 
 @app.get("/api/episodes/{episode_id}")

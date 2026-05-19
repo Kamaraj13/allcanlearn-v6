@@ -9,10 +9,40 @@ from app.travel_characters import TRAVEL_CHARACTERS, CITIES
 from app.tech_startup_characters import TECH_STARTUP_CHARACTERS
 from app.personal_finance_characters import PERSONAL_FINANCE_CHARACTERS
 from app.mental_health_characters import MENTAL_HEALTH_CHARACTERS
-from app.piper_tts_client import speak_text  # Back to original working TTS
+from app.piper_tts_client import speak_text
+from app.config import settings
 
-MAX_TURNS = 8  # Increased for better quality discussions
-MAX_ESSENTIAL_TURNS = 20  # Extended Essential Topics for deeper content
+MAX_TURNS = settings.MAX_TURNS
+MAX_ESSENTIAL_TURNS = settings.MAX_ESSENTIAL_TURNS
+
+# ── Streaming characters ───────────────────────────────────────────────────
+# Used by the streaming generator for any topic
+STREAM_CHARACTERS = [
+    {
+        "name": "The Expert",
+        "role": "Deep domain knowledge",
+        "accent": "en-us",
+        "style": "Precise, evidence-based, uses data and research. Slightly formal.",
+    },
+    {
+        "name": "The Skeptic",
+        "role": "Questions everything",
+        "accent": "en-gb",
+        "style": "Challenges assumptions, plays devil's advocate, demands proof.",
+    },
+    {
+        "name": "The Optimist",
+        "role": "Finds the opportunity",
+        "accent": "en-us",
+        "style": "Enthusiastic, forward-thinking, finds silver linings, uses analogies.",
+    },
+    {
+        "name": "The Pragmatist",
+        "role": "Practical real-world focus",
+        "accent": "en-us",
+        "style": "Cuts through theory, asks 'but what does this mean for real people?'",
+    },
+]
 
 
 def parse_responses(response):
@@ -658,3 +688,103 @@ Return as JSON array with the same format."""
         "topic": topic,
         "turns": turns,
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STREAMING GENERATOR
+#  Yields one turn at a time so the frontend can start playing immediately.
+#  First audio arrives in ~10 seconds instead of waiting 5+ minutes.
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_stream_prompt(history: list, topic: str, round_num: int) -> str:
+    if round_num == 0:
+        return f"""Start a deep podcast discussion about: "{topic}"
+
+The 4 speakers are:
+- The Expert: brings facts, research, data
+- The Skeptic: challenges assumptions, asks hard questions
+- The Optimist: finds opportunity and positive angles
+- The Pragmatist: focuses on real-world impact and practical meaning
+
+Each speaker gives 3-4 sentences. Make it feel like a real, heated, engaging conversation.
+
+Return ONLY a valid JSON array:
+[
+  {{"speaker": "The Expert", "message": "..."}},
+  {{"speaker": "The Skeptic", "message": "..."}},
+  {{"speaker": "The Optimist", "message": "..."}},
+  {{"speaker": "The Pragmatist", "message": "..."}}
+]"""
+
+    recent = history[-8:] if len(history) > 8 else history
+    context = "\n".join(f'{t["speaker"]}: {t["message"]}' for t in recent)
+    is_final = (round_num == MAX_TURNS - 1)
+    instruction = (
+        "Wrap up with key takeaways. Each speaker summarises what they've learned and gives one actionable insight."
+        if is_final else
+        "Build on what was just said. Disagree, challenge, add new angles. Keep the energy up."
+    )
+
+    return f"""Continue the podcast discussion on: "{topic}"
+
+Recent conversation:
+{context}
+
+{instruction}
+
+Each speaker gives 3-4 sentences. Return ONLY a valid JSON array:
+[
+  {{"speaker": "The Expert", "message": "..."}},
+  {{"speaker": "The Skeptic", "message": "..."}},
+  {{"speaker": "The Optimist", "message": "..."}},
+  {{"speaker": "The Pragmatist", "message": "..."}}
+]"""
+
+
+async def run_roundtable_streaming(topic: str, tts_enabled: bool = True):
+    """
+    Async generator — yields one turn dict at a time as soon as it's ready.
+    Each yield: {"speaker", "message", "tts" (filename|None), "turn_index"}
+    Frontend plays turn 0 the moment it arrives (~10 sec). Rest streams in.
+    """
+    history = []
+    turn_index = 0
+
+    system_prompt = (
+        "You are producing a premium podcast with 4 distinct voices debating any topic. "
+        "ALWAYS return a valid JSON array only — no extra text, no markdown, no explanation. "
+        "Make every speaker sound completely different: tone, vocabulary, energy level."
+    )
+
+    for round_num in range(MAX_TURNS):
+        prompt = _build_stream_prompt(history, topic, round_num)
+
+        try:
+            response = await call_groq(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user",   "content": prompt},
+                ],
+                temperature=0.85,
+                max_tokens=1200,
+            )
+        except Exception as e:
+            print(f"[stream] Groq error on round {round_num}: {e}")
+            break
+
+        parsed = normalize_responses(parse_responses(response), STREAM_CHARACTERS)
+        parsed = attach_accents(parsed, STREAM_CHARACTERS)
+
+        if tts_enabled:
+            parsed = await generate_tts_batch(parsed, tts_enabled)
+
+        for entry in parsed:
+            turn = {
+                "speaker":    entry["speaker"],
+                "message":    entry["message"],
+                "tts":        entry.get("tts"),
+                "turn_index": turn_index,
+            }
+            history.append(turn)
+            turn_index += 1
+            yield turn
