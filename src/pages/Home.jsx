@@ -226,7 +226,7 @@ export function Home({ onPlay }) {
           radial-gradient(ellipse 60% 40% at 80% 30%, rgba(236,72,153,0.15) 0%, transparent 60%),
           var(--bg)
         `,
-        padding: '72px 48px 60px',
+        padding: 'clamp(32px, 8vw, 72px) clamp(16px, 5vw, 48px) 60px',
         position: 'relative',
         overflow: 'hidden',
       }}>

@@ -165,7 +165,7 @@ export function Library({ onPlay }) {
   }, [episodes, search, activeFilter]);
 
   return (
-    <div style={{ padding: '40px 48px 80px' }}>
+    <div style={{ padding: 'clamp(20px,5vw,40px) clamp(12px,5vw,48px) 80px' }}>
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <div style={{

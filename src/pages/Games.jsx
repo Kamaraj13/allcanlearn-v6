@@ -31,7 +31,7 @@ export function Games() {
   const GameComp   = activeGame?.component || null;
 
   return (
-    <div style={{ minHeight: '100vh', padding: '48px 32px', maxWidth: '860px', margin: '0 auto' }}>
+    <div style={{ minHeight: '100vh', padding: 'clamp(20px,5vw,48px) clamp(12px,4vw,32px)', maxWidth: '860px', margin: '0 auto' }}>
 
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: '36px' }}>

@@ -218,7 +218,7 @@ export function EpisodeDetail({ audio }) {
   };
 
   if (loading) return (
-    <div style={{ padding: '40px 48px' }}>
+    <div style={{ padding: 'clamp(20px,5vw,40px) clamp(12px,5vw,48px)' }}>
       <Skeleton height="32px" width="200px" style={{ marginBottom: '32px' }} />
       <Skeleton height="60px" style={{ marginBottom: '20px' }} />
       <div style={{ display: 'flex', gap: '16px', marginBottom: '32px' }}>
@@ -268,7 +268,7 @@ export function EpisodeDetail({ audio }) {
         background: topicGradientCss(episode.topic, 90),
       }} />
 
-      <div style={{ padding: '32px 48px 80px' }}>
+      <div style={{ padding: 'clamp(20px,5vw,32px) clamp(12px,5vw,48px) 80px' }}>
         {/* Back button */}
         <button
           onClick={() => navigate(-1)}

@@ -158,7 +158,7 @@ export function CreateEpisode({ onEpisodeCreated }) {
   const progress = Math.round((streamTurns.length / totalExpected) * 100);
 
   return (
-    <div style={{ minHeight: '100vh', padding: '48px 24px', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', padding: 'clamp(20px,5vw,48px) clamp(12px,4vw,24px)', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '700px' }}>
 
         {/* Header */}

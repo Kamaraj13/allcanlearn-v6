@@ -264,3 +264,81 @@ img {
     display: block;
   }
 }
+
+/* ─── Mobile responsive overrides ──────────────────────── */
+@media (max-width: 768px) {
+
+  /* Tighten page padding on all pages */
+  div[style*="padding: '48px 32px'"],
+  div[style*='padding: "48px 32px"'] {
+    padding: 20px 16px !important;
+  }
+
+  /* Global page padding fix via class */
+  .page-content {
+    padding: 20px 16px !important;
+    max-width: 100% !important;
+  }
+
+  /* Headings scale down */
+  h1 { font-size: clamp(1.4rem, 5vw, 2rem) !important; }
+  h2 { font-size: clamp(1.1rem, 4vw, 1.5rem) !important; }
+
+  /* Cards in grids go single column */
+  .card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Player bar compact */
+  .player-bar { height: 64px !important; }
+
+  /* Floating pills — smaller on mobile */
+  .floating-pill {
+    width: 44px !important;
+    height: 44px !important;
+    bottom: 12px !important;
+  }
+
+  /* Push floating panels up from bottom on mobile */
+  .floating-panel {
+    bottom: 80px !important;
+    right: 8px !important;
+    left: 8px !important;
+    width: auto !important;
+    max-width: calc(100vw - 16px) !important;
+  }
+
+  /* Hide scrollbar on mobile game panels */
+  .game-scroll { overflow-x: hidden !important; }
+
+  /* Ensure text is readable — bump contrast */
+  body {
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ─── Extra small phones ────────────────────────────────── */
+@media (max-width: 420px) {
+  h1 { font-size: 1.3rem !important; }
+
+  /* Stack side-by-side elements */
+  .flex-mobile-col {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  /* Full-width buttons on small phones */
+  .btn-mobile-full {
+    width: 100% !important;
+  }
+}
+
+/* ─── Safe area insets (iPhone notch / Dynamic Island) ──── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .player-bar-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

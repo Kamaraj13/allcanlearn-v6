@@ -1,0 +1,31 @@
+{
+  "short_name": "AllCanLearn",
+  "name": "AllCanLearn — AI Roundtable",
+  "description": "Type any topic. Hear 4 AI experts debate it as a real podcast.",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080F",
+  "theme_color": "#7C3AED",
+  "categories": ["education", "entertainment", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Create Episode",
+      "short_name": "Create",
+      "description": "Generate a new AI podcast",
+      "url": "/create",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Library",
+      "short_name": "Library",
+      "description": "Browse your episodes",
+      "url": "/library",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
