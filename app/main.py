@@ -13,7 +13,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import WebSocket, WebSocketDisconnect
 from datetime import datetime
 from app.moderator import run_roundtable, run_roundtable_streaming
-from app.episodes import get_audio_files, add_episode, get_all_episodes
+from app.episodes import get_audio_files, add_episode, get_all_episodes, update_episode_audio
+from app.audio_merger import merge_episode
 from app.quiz_generator import generate_quiz_questions, generate_topic_description
 from app.chat import manager
 from app.config import settings
@@ -137,7 +138,16 @@ async def generate_stream(topic: str = ""):
 
             # All turns done — save to DB
             episode_id = add_episode(topic.strip(), all_turns)
-            yield f"data: {_json.dumps({'type': 'done', 'episode_id': episode_id})}\n\n"
+
+            # Merge all turn audio files into one continuous episode file
+            merged_filename = merge_episode(episode_id, all_turns, settings.TTS_OUTPUT_DIR)
+            if merged_filename:
+                update_episode_audio(episode_id, merged_filename)
+                merged_url = f"/tts_output/{merged_filename}"
+            else:
+                merged_url = None
+
+            yield f"data: {_json.dumps({'type': 'done', 'episode_id': episode_id, 'merged_audio': merged_url})}\n\n"
 
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)

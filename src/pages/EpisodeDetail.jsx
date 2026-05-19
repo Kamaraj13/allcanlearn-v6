@@ -158,22 +158,34 @@ export function EpisodeDetail({ audio }) {
   const { episode, loading, error } = useEpisode(id);
   const activeRef = useRef(null);
 
-  // Load tracks when episode is ready
+  // Load audio when episode is ready
+  // Prefer single merged file — feels like one continuous conversation.
+  // Falls back to individual turn playlist if merge isn't available yet.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!episode?.turns || !audio) return;
-    const tracks = episode.turns
-      .filter(t => t.tts)
-      .map(t => ({
-        src: `/tts_output/${t.tts}`,
-        speaker: t.speaker,
-        topic: episode.topic,
-        title: `${t.speaker}: ${t.message?.slice(0, 40)}…`,
-      }));
-    if (tracks.length > 0) {
-      audio.loadTracks(tracks, 0);
+    if (!episode || !audio) return;
+
+    if (episode.merged_audio) {
+      // Single merged file — the whole episode as one continuous audio
+      audio.loadTracks([{
+        src:     episode.merged_audio,
+        speaker: 'Full Episode',
+        topic:   episode.topic,
+        title:   episode.topic,
+      }], 0);
+    } else if (episode.turns?.length > 0) {
+      // Fallback: individual turn playlist
+      const tracks = episode.turns
+        .filter(t => t.tts)
+        .map(t => ({
+          src:     `/tts_output/${t.tts}`,
+          speaker: t.speaker,
+          topic:   episode.topic,
+          title:   `${t.speaker}: ${t.message?.slice(0, 40)}…`,
+        }));
+      if (tracks.length > 0) audio.loadTracks(tracks, 0);
     }
-  }, [episode]); // audio is stable ref, episode drives the change
+  }, [episode]);
 
   // Scroll active turn into view
   useEffect(() => {
@@ -394,7 +406,7 @@ export function EpisodeDetail({ audio }) {
             )}
 
             {/* Play button */}
-            {audio && episode.turns?.some(t => t.tts) && (
+            {audio && (episode.merged_audio || episode.turns?.some(t => t.tts)) && (
               <div style={{ marginBottom: '24px' }}>
                 <button
                   onClick={() => audio.isPlaying ? audio.pause() : audio.play()}

@@ -9,41 +9,38 @@ from app.database import Base
 class Episode(Base):
     __tablename__ = "episodes"
 
-    id          = Column(String, primary_key=True, index=True)
-    topic       = Column(String, nullable=False)
-    created_at  = Column(DateTime, default=datetime.utcnow)
-    status      = Column(String, default="ready")   # generating | ready | failed
-    turns_count = Column(Integer, default=0)
+    id           = Column(String, primary_key=True, index=True)
+    topic        = Column(String, nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+    status       = Column(String, default="ready")   # generating | ready | failed
+    turns_count  = Column(Integer, default=0)
     is_essential = Column(Boolean, default=False)
+    merged_audio = Column(String, nullable=True)     # filename of merged episode audio
 
     # Relationship — loads all turns for this episode
     turns = relationship("Turn", back_populates="episode", order_by="Turn.turn_index", cascade="all, delete-orphan")
 
     def to_summary_dict(self):
         """Lightweight dict for episode list views — no turn text."""
-        audio_files = [
-            f"/tts_output/{t.audio_file}"
-            for t in self.turns
-            if t.audio_file
-        ]
         return {
-            "id":          self.id,
-            "topic":       self.topic,
-            "created_at":  self.created_at.isoformat() if self.created_at else None,
-            "turns_count": self.turns_count,
-            "audio_files": audio_files,
-            "status":      self.status,
+            "id":           self.id,
+            "topic":        self.topic,
+            "created_at":   self.created_at.isoformat() if self.created_at else None,
+            "turns_count":  self.turns_count,
+            "status":       self.status,
+            "merged_audio": f"/tts_output/{self.merged_audio}" if self.merged_audio else None,
         }
 
     def to_full_dict(self):
-        """Full dict including all turn text and audio — for episode detail page."""
+        """Full dict including all turn text and merged audio — for episode detail page."""
         return {
-            "id":         self.id,
-            "topic":      self.topic,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "turns_count": self.turns_count,
-            "status":     self.status,
-            "turns": [t.to_dict() for t in self.turns],
+            "id":           self.id,
+            "topic":        self.topic,
+            "created_at":   self.created_at.isoformat() if self.created_at else None,
+            "turns_count":  self.turns_count,
+            "status":       self.status,
+            "merged_audio": f"/tts_output/{self.merged_audio}" if self.merged_audio else None,
+            "turns":        [t.to_dict() for t in self.turns],
         }
 
 

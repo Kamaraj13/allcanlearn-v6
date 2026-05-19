@@ -130,6 +130,21 @@ def get_all_episodes() -> List[dict]:
         db.close()
 
 
+def update_episode_audio(episode_id: str, merged_filename: str):
+    """Save the merged audio filename to the episode record."""
+    db = _session()
+    try:
+        ep = db.query(Episode).filter(Episode.id == episode_id).first()
+        if ep:
+            ep.merged_audio = merged_filename
+            db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"update_episode_audio error: {e}")
+    finally:
+        db.close()
+
+
 def get_audio_files() -> List[dict]:
     """List all audio files currently on disk in tts_output/."""
     files = []
