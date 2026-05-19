@@ -1,106 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import Sidebar from './components/Sidebar';
-import HomePage from './components/HomePage';
-import CreatePage from './components/CreatePage';
-import DetailPage from './components/DetailPage';
-import ChatPanel from './components/ChatPanel';
-import './App.css';
+import React, { useCallback } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { ToastProvider } from './components/UI/Toast';
+import Layout from './components/Layout/Layout';
+import Home from './pages/Home';
+import Library from './pages/Library';
+import CreateEpisode from './pages/CreateEpisode';
+import EpisodeDetail from './pages/EpisodeDetail';
+import ChatPanel from './components/Chat/ChatPanel';
+import { useAudio } from './hooks/useAudio';
+import { useEpisodes } from './hooks/useEpisodes';
 
-function App() {
-  const [currentPage, setCurrentPage] = useState('home');
-  const [currentEpisode, setCurrentEpisode] = useState(null);
-  const [isBrightMode, setIsBrightMode] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
+function AppInner() {
+  const audio = useAudio();
+  const { episodes, refetch } = useEpisodes();
 
-  useEffect(() => {
-    // Load saved theme
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'bright') {
-      setIsBrightMode(true);
-      document.body.classList.add('bright-mode');
-    }
+  const handleEpisodeCreated = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
-    // Load sound preference
-    const soundPref = localStorage.getItem('soundEnabled');
-    if (soundPref === 'false') {
-      setSoundEnabled(false);
-    }
+  const handlePlay = useCallback((episode) => {
+    // Minimal: user will navigate to episode page to start playback
+    // but we accept the callback from cards
   }, []);
 
-  const toggleTheme = () => {
-    setIsBrightMode(!isBrightMode);
-    if (!isBrightMode) {
-      document.body.classList.add('bright-mode');
-      localStorage.setItem('theme', 'bright');
-    } else {
-      document.body.classList.remove('bright-mode');
-      localStorage.setItem('theme', 'dark');
-    }
-  };
-
-  const toggleSound = () => {
-    setSoundEnabled(!soundEnabled);
-    localStorage.setItem('soundEnabled', !soundEnabled);
-  };
-
-  const showPage = (page) => {
-    setCurrentPage(page);
-  };
-
-  const viewEpisode = (episode) => {
-    setCurrentEpisode(episode);
-    setCurrentPage('detail');
-  };
-
   return (
-    <div className={`app ${isBrightMode ? 'bright-mode' : ''}`}>
-      {/* Animated Background */}
-      <div className="slideshow-background">
-        {[...Array(44)].map((_, i) => (
-          <img 
-            key={i} 
-            src={`/static/assets/bg-frame-${(i % 4) + 1}.jpg`} 
-            alt="Background"
-            onError={(e) => {
-              // Fallback for missing images
-              e.target.style.display = 'none';
-            }}
+    <>
+      <Routes>
+        <Route element={<Layout audio={audio} recentEpisodes={episodes.slice(0, 4)} />}>
+          <Route
+            path="/"
+            element={<Home onPlay={handlePlay} />}
           />
-        ))}
-      </div>
-
-      {/* Sidebar */}
-      <Sidebar 
-        currentPage={currentPage}
-        showPage={showPage}
-        isBrightMode={isBrightMode}
-        soundEnabled={soundEnabled}
-        toggleTheme={toggleTheme}
-        toggleSound={toggleSound}
-      />
-
-      {/* Main Content */}
-      <div className="content">
-        {currentPage === 'home' && (
-          <HomePage viewEpisode={viewEpisode} />
-        )}
-        {currentPage === 'create' && (
-          <CreatePage 
-            showPage={showPage}
-            viewEpisode={viewEpisode}
+          <Route
+            path="/library"
+            element={<Library onPlay={handlePlay} />}
           />
-        )}
-        {currentPage === 'detail' && (
-          <DetailPage 
-            episode={currentEpisode}
-            showPage={showPage}
+          <Route
+            path="/create"
+            element={<CreateEpisode onEpisodeCreated={handleEpisodeCreated} />}
           />
-        )}
-      </div>
+          <Route
+            path="/episode/:id"
+            element={<EpisodeDetail audio={audio} />}
+          />
+          {/* Catch-all → home */}
+          <Route path="*" element={<Home onPlay={handlePlay} />} />
+        </Route>
+      </Routes>
 
-      {/* Chat Panel */}
-      <ChatPanel soundEnabled={soundEnabled} />
-    </div>
+      {/* Floating chat panel — always available */}
+      <ChatPanel />
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <ToastProvider>
+        <AppInner />
+      </ToastProvider>
+    </BrowserRouter>
   );
 }
 

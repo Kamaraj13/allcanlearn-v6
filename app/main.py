@@ -44,8 +44,16 @@ logger = logging.getLogger(__name__)
 os.makedirs("tts_output", exist_ok=True)
 os.makedirs("episodes_data", exist_ok=True)
 
-# Mount static files
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# Mount static files — prefer build/ (React production build), fall back to app/static
+import pathlib
+_build_static = pathlib.Path("build/static")
+_legacy_static = pathlib.Path("app/static")
+
+if _build_static.exists():
+    app.mount("/static", StaticFiles(directory="build/static"), name="static")
+else:
+    app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 app.mount("/tts_output", StaticFiles(directory="tts_output"), name="tts_output")
 
 # API Routes - Define these BEFORE the catch-all
@@ -102,14 +110,15 @@ def get_episode_by_id(episode_id: str):
     return episode
 
 
-# Serve React app
+# Serve React app (prefer build/index.html, fall back to app/static/index.html)
+def _index_html():
+    if pathlib.Path("build/index.html").exists():
+        return "build/index.html"
+    return "app/static/index.html"
+
 @app.get("/")
 async def read_index():
-    return FileResponse('app/static/index.html')
-
-@app.get("/static/{file_path:path}")
-async def read_static(file_path: str):
-    return FileResponse(f'app/static/{file_path}')
+    return FileResponse(_index_html())
 
 # Fallback for React Router - Must be LAST
 @app.get("/{full_path:path}")
@@ -117,17 +126,8 @@ async def catch_all(full_path: str):
     # Don't intercept API routes, static files, tts_output, or quiz
     if full_path.startswith('api/') or full_path.startswith('static/') or full_path.startswith('tts_output/') or full_path == 'quiz':
         raise HTTPException(status_code=404, detail="Not found")
-    # Otherwise serve React app
-    return FileResponse('app/static/index.html')
-
-
-@app.get("/api/episodes")
-def get_episodes():
-    """Get all episodes - client-side caches for 5 minutes"""
-    episodes = get_all_episodes()
-    return {"episodes": episodes}
-
-
+    # Otherwise serve React app for client-side routing
+    return FileResponse(_index_html())
 
 
 @app.get("/api/episodes/{episode_id}")
