@@ -395,39 +395,50 @@ async def run_custom_roundtable(tts_enabled=True, custom_topic=""):
 
     # Generate the discussion
     for i in range(MAX_TURNS):
+        recent = turns[-10:] if len(turns) > 10 else turns
+        context = "\n".join(f'{t["speaker"]}: {t["message"]}' for t in recent) if recent else ""
+
         if i == 0:
-            prompt = f"""Create a roundtable discussion about "{topic}" with 4 speakers: Expert Analyst, Research Specialist, Industry Professional, and Enthusiast.
+            prompt = f"""Start a natural, flowing podcast discussion about "{topic}" with 4 speakers:
+- Expert Analyst: data-driven, formal, cites evidence
+- Research Specialist: academic, loves nuance, brings surprising facts
+- Industry Professional: practical, no-nonsense, talks from real experience
+- Enthusiast: passionate, asks the questions the audience is thinking
 
-Each person should provide their unique perspective on {topic}. Make it engaging and informative.
+Rules:
+- ANY speaker order — not always the same rotation
+- Short reactions count as turns ("Wait, really? That changes things.")
+- Speakers reference each other by name
+- Mix short bursts with longer points
+- Generate 6-8 turns for this opening
 
-Return your response as a JSON array with this format:
+Return ONLY a valid JSON array:
 [
-    {{"speaker": "Expert Analyst", "message": "their message"}},
-    {{"speaker": "Research Specialist", "message": "their message"}},
-    {{"speaker": "Industry Professional", "message": "their message"}},
-    {{"speaker": "Enthusiast", "message": "their message"}}
-]
-
-Keep responses concise but insightful (2-3 sentences each)."""
-
+  {{"speaker": "...", "message": "..."}},
+  ...
+]"""
         else:
-            prompt = f"""Continue the roundtable discussion about "{topic}" with the same 4 speakers.
+            is_final = (i == MAX_TURNS - 1)
+            instruction = (
+                "Wrap up. Each speaker gives one final honest takeaway. Keep it real, not polished."
+                if is_final else
+                "Push the debate forward. Someone disagrees with what was just said. Someone makes it personal with a real example. Not all 4 need to speak."
+            )
+            prompt = f"""Continue the discussion on "{topic}".
 
-Build upon the previous points. Each speaker should:
-- React to what others said
-- Add new insights or ask questions
-- Keep responses concise (2-3 sentences each)
+Recent conversation:
+{context}
 
-Return your response as a JSON array with this format:
+{instruction}
+
+Return ONLY a valid JSON array (any order, 4-8 turns):
 [
-    {{"speaker": "Expert Analyst", "message": "their message"}},
-    {{"speaker": "Research Specialist", "message": "their message"}},
-    {{"speaker": "Industry Professional", "message": "their message"}},
-    {{"speaker": "Enthusiast", "message": "their message"}}
+  {{"speaker": "...", "message": "..."}},
+  ...
 ]"""
 
         response = await call_groq([
-            {"role": "system", "content": "You are facilitating an engaging roundtable discussion with 4 experts discussing various perspectives on a topic. Always return your response as a valid JSON array."},
+            {"role": "system", "content": "You are producing a natural, unscripted podcast debate. ALWAYS return a valid JSON array only — no markdown, no extra text. Speakers go in any order, have unequal airtime, reference each other, and occasionally crack jokes or push back hard."},
             {"role": "user", "content": prompt},
         ])
 
@@ -697,47 +708,61 @@ Return as JSON array with the same format."""
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_stream_prompt(history: list, topic: str, round_num: int) -> str:
+    speakers_info = """The 4 speakers and their personalities:
+- The Expert: cites facts and data, slightly formal, uses phrases like "Research shows..." or "The data is clear..."
+- The Skeptic: challenges everything, sarcastic but sharp, uses phrases like "Hold on—" or "That's a stretch..."
+- The Optimist: enthusiastic, uses analogies, finds the silver lining, uses phrases like "But think about it this way..."
+- The Pragmatist: cuts through theory, blunt, asks "But what does this actually mean for real people?"
+"""
+
     if round_num == 0:
-        return f"""Start a deep podcast discussion about: "{topic}"
+        return f"""Start a natural, flowing podcast discussion about: "{topic}"
 
-The 4 speakers are:
-- The Expert: brings facts, research, data
-- The Skeptic: challenges assumptions, asks hard questions
-- The Optimist: finds opportunity and positive angles
-- The Pragmatist: focuses on real-world impact and practical meaning
+{speakers_info}
 
-Each speaker gives 3-4 sentences. Make it feel like a real, heated, engaging conversation.
+Rules for the conversation:
+- Speakers can go in ANY order — not always Expert first
+- A speaker can react briefly ("Ha — exactly!" counts as a turn)
+- Speakers reference each other by name ("The Skeptic raised a fair point...")
+- NOT all 4 need to speak every time — let it flow naturally
+- Mix short reactions with longer points
+- Generate 6 to 8 turns total for this opening exchange
 
-Return ONLY a valid JSON array:
+Return ONLY a valid JSON array (any order, any length):
 [
   {{"speaker": "The Expert", "message": "..."}},
   {{"speaker": "The Skeptic", "message": "..."}},
-  {{"speaker": "The Optimist", "message": "..."}},
-  {{"speaker": "The Pragmatist", "message": "..."}}
+  ...
 ]"""
 
-    recent = history[-8:] if len(history) > 8 else history
+    recent = history[-10:] if len(history) > 10 else history
     context = "\n".join(f'{t["speaker"]}: {t["message"]}' for t in recent)
     is_final = (round_num == MAX_TURNS - 1)
-    instruction = (
-        "Wrap up with key takeaways. Each speaker summarises what they've learned and gives one actionable insight."
-        if is_final else
-        "Build on what was just said. Disagree, challenge, add new angles. Keep the energy up."
-    )
+
+    if is_final:
+        instruction = "Wrap it up naturally. Each speaker gives their final take — one honest insight or actionable point. Let The Skeptic have the last word with something unexpectedly agreeable."
+    else:
+        instruction = "Continue the argument. Someone disagrees sharply. Someone makes a joke. Someone brings a surprising real-world example. Keep the energy uneven — not everyone gets equal airtime."
 
     return f"""Continue the podcast discussion on: "{topic}"
 
 Recent conversation:
 {context}
 
+{speakers_info}
+
 {instruction}
 
-Each speaker gives 3-4 sentences. Return ONLY a valid JSON array:
+Rules:
+- ANY order, NOT fixed rotation
+- Short reactions are fine ("Come on, that's not the whole story.")
+- Reference each other by name
+- 5 to 8 turns this round
+
+Return ONLY a valid JSON array:
 [
-  {{"speaker": "The Expert", "message": "..."}},
-  {{"speaker": "The Skeptic", "message": "..."}},
-  {{"speaker": "The Optimist", "message": "..."}},
-  {{"speaker": "The Pragmatist", "message": "..."}}
+  {{"speaker": "...", "message": "..."}},
+  ...
 ]"""
 
 
@@ -751,9 +776,11 @@ async def run_roundtable_streaming(topic: str, tts_enabled: bool = True):
     turn_index = 0
 
     system_prompt = (
-        "You are producing a premium podcast with 4 distinct voices debating any topic. "
+        "You are producing a premium podcast with 4 distinct personalities having a real argument. "
         "ALWAYS return a valid JSON array only — no extra text, no markdown, no explanation. "
-        "Make every speaker sound completely different: tone, vocabulary, energy level."
+        "The conversation must feel unscripted: unequal airtime, interruptions, short reactions, "
+        "speakers referencing each other by name, disagreements, occasional jokes. "
+        "Never rotate speakers in a fixed 1-2-3-4 pattern. Let the conversation breathe."
     )
 
     for round_num in range(MAX_TURNS):
