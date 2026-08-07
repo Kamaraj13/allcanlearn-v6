@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 /* ── Page messages ──────────────────────────────────────── */
 const PAGE_CONFIG = {
@@ -189,7 +190,7 @@ function SpeechBubble({ message, facingLeft }) {
         bottom: '88px',
         left: facingLeft ? 'auto' : '-10px',
         right: facingLeft ? '-10px' : 'auto',
-        width: '200px',
+        width: 'min(200px, calc(100vw - 48px))',
         background: '#fff',
         borderRadius: '14px',
         padding: '10px 12px',
@@ -233,6 +234,7 @@ function SpeechBubble({ message, facingLeft }) {
 /* ── Main Component ─────────────────────────────────────── */
 export default function SquirrelGuide() {
   const location = useLocation();
+  const isMobile = useIsMobile();
   const [x, setX] = useState(window.innerWidth * 0.55);
   const [running, setRunning] = useState(false);
   const [facingLeft, setFacingLeft] = useState(false);
@@ -245,11 +247,19 @@ export default function SquirrelGuide() {
   const runTimer = useRef(null);
   const prevX = useRef(x);
 
-  // Bottom offset — sits above player bar if audio is playing
-  const bottomY = 100;
+  // Bottom offset — sits above player bar if audio is playing.
+  // On phones he hugs the bottom edge so he never covers page content.
+  const bottomY = isMobile ? 12 : 100;
 
   const runTo = useCallback((targetX, config) => {
-    const clamped = Math.max(80, Math.min(window.innerWidth - 160, targetX));
+    // On narrow screens keep him left enough that his speech bubble
+    // (up to 200px wide, anchored to his right) stays on screen.
+    const mobile = window.innerWidth <= 768;
+    const minX = mobile ? 16 : 80;
+    const maxX = mobile
+      ? Math.max(16, window.innerWidth - 220)
+      : window.innerWidth - 160;
+    const clamped = Math.max(minX, Math.min(maxX, targetX));
     const diff = clamped - prevX.current;
     if (Math.abs(diff) < 40) return;
 

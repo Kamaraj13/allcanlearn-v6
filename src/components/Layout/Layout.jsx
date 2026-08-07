@@ -94,13 +94,12 @@ export function Layout({ audio, recentEpisodes }) {
           .mobile-header {
             display: flex !important;
           }
+          /* No transform rules here — Framer Motion owns the slide (inline
+             transforms override media queries). Chrome/paint styling only. */
           .sidebar-root {
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
             z-index: 100 !important;
           }
           .sidebar-root.open {
-            transform: translateX(0);
             box-shadow: 4px 0 32px rgba(0,0,0,0.6);
           }
         }

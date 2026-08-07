@@ -11,6 +11,7 @@ import DinoRun      from './DinoRun';
 import Pong         from './Pong';
 import Game2048     from './Game2048';
 import MemoryMatch  from './MemoryMatch';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const GAMES = [
   { id: 'snake',    label: 'Snake',          emoji: '🐍', component: Snake,         color: '#39ff14' },
@@ -29,6 +30,7 @@ export function FloatingGame({ bottomOffset = 20 }) {
   const [open,      setOpen]      = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [activeId,  setActiveId]  = useState(null); // null = picker
+  const isMobile = useIsMobile();
 
   const activeGame = GAMES.find(g => g.id === activeId);
   const GameComp   = activeGame?.component || null;
@@ -63,8 +65,10 @@ export function FloatingGame({ bottomOffset = 20 }) {
             exit={{    opacity: 0, scale: 0.9,  y: 16 }}
             transition={{ type: 'spring', stiffness: 320, damping: 28 }}
             style={{
-              position: 'fixed', bottom: '160px', right: '84px',
-              width: activeGame ? '340px' : '320px',
+              position: 'fixed', bottom: '160px',
+              // 84px right + 340px wide overflows a 375px phone — clamp both.
+              right: isMobile ? '12px' : '84px',
+              width: `min(${activeGame ? '340px' : '320px'}, calc(100vw - 24px))`,
               background: 'var(--surface)', border: '1px solid var(--border-h)',
               borderRadius: '16px', zIndex: 199, display: 'flex',
               flexDirection: 'column', overflow: 'hidden',

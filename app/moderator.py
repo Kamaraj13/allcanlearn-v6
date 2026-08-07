@@ -171,18 +171,29 @@ async def generate_tts_batch(entries, tts_enabled):
     # Generate all TTS files in parallel
     tts_tasks = []
     for entry in entries:
-        task = speak_text(entry["message"], entry["accent"])
+        # Pass the speaker so each panellist gets their own voice.
+        task = speak_text(entry["message"], entry.get("accent"),
+                          speaker=entry.get("speaker"))
         tts_tasks.append(task)
-    
+
     tts_results = await asyncio.gather(*tts_tasks, return_exceptions=True)
-    
+
     # Attach results to entries
+    failed = 0
     for entry, tts_result in zip(entries, tts_results):
-        if not isinstance(tts_result, Exception) and tts_result:
+        if isinstance(tts_result, Exception):
+            print(f"[tts] error for {entry.get('speaker')}: {tts_result}")
+            entry["tts"] = None
+            failed += 1
+        elif tts_result:
             entry["tts"] = tts_result  # Just filename, no path prefix
         else:
             entry["tts"] = None
-    
+            failed += 1
+
+    if failed:
+        print(f"[tts] WARNING: {failed}/{len(entries)} turns have no audio")
+
     return entries
 
 

@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, Library, Plus, Gamepad2, Clock, X } from 'lucide-react';
 import { topicGradientCss } from '../../services/api';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 const navItems = [
   { to: '/',        label: 'Home',           icon: Home },
@@ -13,6 +14,7 @@ const navItems = [
 
 export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   return (
     <>
@@ -26,7 +28,11 @@ export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
 
       <motion.aside
         initial={false}
-        animate={{ x: 0 }}
+        // Framer Motion writes `transform` as an INLINE style, which beats any
+        // CSS media query. So the off-canvas state has to live here, not in CSS —
+        // a `@media` rule setting translateX(-100%) is silently overridden.
+        animate={{ x: isMobile && !isOpen ? '-100%' : 0 }}
+        transition={{ type: 'tween', duration: 0.3, ease: 'easeOut' }}
         style={{
           width: 'var(--sidebar-w)',
           background: 'var(--surface)',
@@ -239,13 +245,8 @@ export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
 
       <style>{`
         @media (max-width: 768px) {
-          .sidebar-root {
-            transform: translateX(-100%);
-            transition: transform 0.3s ease;
-          }
-          .sidebar-root.open {
-            transform: translateX(0);
-          }
+          /* Slide is driven by Framer Motion above — inline transforms win over
+             media queries, so no transform rules belong here. */
           .sidebar-close {
             display: flex !important;
           }

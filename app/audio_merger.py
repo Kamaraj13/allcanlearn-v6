@@ -48,7 +48,12 @@ def merge_turn_files(turn_files: list[str], output_path: str) -> bool:
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', list_path,
-                '-c', 'copy',      # copy codec — fast, no re-encode
+                # Re-encode to a single uniform PCM stream. `-c copy` produced a
+                # file whose header described only the first segment, so players
+                # showed the wrong duration and often stopped after one turn.
+                '-c:a', 'pcm_s16le',
+                '-ar', '24000',
+                '-ac', '1',
                 output_path,
             ],
             capture_output=True,

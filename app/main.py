@@ -194,6 +194,17 @@ async def catch_all(full_path: str):
     return FileResponse(_index_html())
 
 
+@app.get("/api/tts/health")
+def tts_health():
+    """What the TTS stack can actually do on this machine.
+
+    Hit https://allcanlearn.uk/api/tts/health after deploying to confirm the
+    server has a Groq key, ffmpeg, and (optionally) Piper voice models.
+    """
+    from app.piper_tts_client import diagnose
+    return diagnose()
+
+
 @app.get("/api/audio-files")
 def get_audio_files_list():
     """Get list of all audio files"""
