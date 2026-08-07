@@ -92,6 +92,24 @@ Or just:
 
 ---
 
+## Making changes
+
+`src/` is the React source. `build/` is the **compiled output** of it, and that
+is what the server actually sends to browsers. Editing `src/` alone changes
+nothing on the live site — it has to be rebuilt.
+
+| You changed | What to run |
+|-------------|-------------|
+| Anything in `src/` or `public/` | `./release.sh "your commit message"` |
+| Anything in `app/` (Python) | normal `git commit` + `git push` |
+
+Then deploy: `cd /home/vikki/AllCanLearn-v6 && ./deploy.sh` on the Ubuntu box.
+
+Never hand-edit files in `build/` — they are machine-generated and get
+overwritten by the next build.
+
+---
+
 ## API Endpoints
 
 | Method | Path | Description |
@@ -101,6 +119,7 @@ Or just:
 | POST | `/generate?topic=...` | Generate a new episode |
 | GET | `/api/topics/popular` | Browse topic categories |
 | WS | `/ws/chat?username=...` | Live group chat |
+| GET | `/api/tts/health` | Whether TTS can actually run (key, ffmpeg, Piper models) |
 
 ---
 
