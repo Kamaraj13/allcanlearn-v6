@@ -180,9 +180,20 @@ def _index_html():
         return "build/index.html"
     return "app/static/index.html"
 
+
+# index.html names the content-hashed JS bundle, so it must NEVER be cached —
+# a stale copy pins visitors to an old build after every deploy. The hashed
+# assets under /static are immutable and cached hard by the browser.
+_NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
+
+
+def _index_response():
+    return FileResponse(_index_html(), headers=_NO_STORE)
+
+
 @app.get("/")
 async def read_index():
-    return FileResponse(_index_html())
+    return _index_response()
 
 # Fallback for React Router - Must be LAST
 @app.get("/{full_path:path}")
@@ -191,7 +202,7 @@ async def catch_all(full_path: str):
     if full_path.startswith('api/') or full_path.startswith('static/') or full_path.startswith('tts_output/') or full_path == 'quiz':
         raise HTTPException(status_code=404, detail="Not found")
     # Otherwise serve React app for client-side routing
-    return FileResponse(_index_html())
+    return _index_response()
 
 
 @app.get("/api/tts/health")

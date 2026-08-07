@@ -1,9 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { Home, Library, Plus, Gamepad2, Clock, X } from 'lucide-react';
 import { topicGradientCss } from '../../services/api';
-import { useIsMobile } from '../../hooks/useIsMobile';
 
 const navItems = [
   { to: '/',        label: 'Home',           icon: Home },
@@ -14,7 +12,6 @@ const navItems = [
 
 export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
   const navigate = useNavigate();
-  const isMobile = useIsMobile();
 
   return (
     <>
@@ -26,13 +23,12 @@ export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
         />
       )}
 
-      <motion.aside
-        initial={false}
-        // Framer Motion writes `transform` as an INLINE style, which beats any
-        // CSS media query. So the off-canvas state has to live here, not in CSS —
-        // a `@media` rule setting translateX(-100%) is silently overridden.
-        animate={{ x: isMobile && !isOpen ? '-100%' : 0 }}
-        transition={{ type: 'tween', duration: 0.3, ease: 'easeOut' }}
+      {/* Deliberately a plain <aside>, not motion.aside.
+          Framer Motion writes `transform` as an inline style, which silently
+          overrode the mobile @media rule and left the sidebar covering the
+          whole phone screen. The slide is pure CSS now — one owner of the
+          transform, nothing to conflict with. */}
+      <aside
         style={{
           width: 'var(--sidebar-w)',
           background: 'var(--surface)',
@@ -241,12 +237,20 @@ export function Sidebar({ recentEpisodes = [], isOpen, onClose }) {
             </div>
           </div>
         )}
-      </motion.aside>
+      </aside>
 
       <style>{`
         @media (max-width: 768px) {
-          /* Slide is driven by Framer Motion above — inline transforms win over
-             media queries, so no transform rules belong here. */
+          /* Off-canvas by default on phones; the .open class slides it in.
+             Nothing else may set a transform on this element — an inline
+             transform from an animation library would win over these rules. */
+          .sidebar-root {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+          }
+          .sidebar-root.open {
+            transform: translateX(0);
+          }
           .sidebar-close {
             display: flex !important;
           }

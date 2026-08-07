@@ -179,6 +179,10 @@ function SquirrelSVG({ running, talking, facingLeft, happy }) {
 
 /* ── Speech Bubble ──────────────────────────────────────── */
 function SpeechBubble({ message, facingLeft }) {
+  // On phones Nutty is clamped to the left of the screen, so a bubble anchored
+  // to his right would hang off the left edge. Always open it rightward there.
+  const narrow = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const anchorRight = facingLeft && !narrow;
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.7, y: 10 }}
@@ -188,8 +192,8 @@ function SpeechBubble({ message, facingLeft }) {
       style={{
         position: 'absolute',
         bottom: '88px',
-        left: facingLeft ? 'auto' : '-10px',
-        right: facingLeft ? '-10px' : 'auto',
+        left: anchorRight ? 'auto' : '-10px',
+        right: anchorRight ? '-10px' : 'auto',
         width: 'min(200px, calc(100vw - 48px))',
         background: '#fff',
         borderRadius: '14px',
@@ -210,8 +214,8 @@ function SpeechBubble({ message, facingLeft }) {
       <div style={{
         position: 'absolute',
         bottom: '-10px',
-        left: facingLeft ? 'auto' : '24px',
-        right: facingLeft ? '24px' : 'auto',
+        left: anchorRight ? 'auto' : '24px',
+        right: anchorRight ? '24px' : 'auto',
         width: 0, height: 0,
         borderLeft: '8px solid transparent',
         borderRight: '8px solid transparent',
@@ -220,8 +224,8 @@ function SpeechBubble({ message, facingLeft }) {
       <div style={{
         position: 'absolute',
         bottom: '-7px',
-        left: facingLeft ? 'auto' : '25px',
-        right: facingLeft ? '25px' : 'auto',
+        left: anchorRight ? 'auto' : '25px',
+        right: anchorRight ? '25px' : 'auto',
         width: 0, height: 0,
         borderLeft: '7px solid transparent',
         borderRight: '7px solid transparent',
