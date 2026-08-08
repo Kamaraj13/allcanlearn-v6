@@ -13,6 +13,11 @@ class Settings:
     # ── API Keys ──────────────────────────────────────────────
     GROQ_API_KEY: str       = os.getenv("GROQ_API_KEY", "")
 
+    # Model used to write the episode script. 70b writes noticeably better
+    # dialogue; set GROQ_MODEL=llama-3.1-8b-instant in .env for faster/cheaper
+    # generation if you prefer.
+    GROQ_MODEL: str         = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
     # ── Server ────────────────────────────────────────────────
     HOST: str               = os.getenv("HOST", "0.0.0.0")
     PORT: int               = int(os.getenv("PORT", "8000"))

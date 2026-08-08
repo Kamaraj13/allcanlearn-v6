@@ -45,18 +45,67 @@ STREAM_CHARACTERS = [
 ]
 
 
+def _salvage_turns(text: str) -> list:
+    """Pull whatever speaker/message pairs we can out of broken JSON.
+
+    The model occasionally emits an object like
+        {"speaker": "The Pragmatist", "chuckling", "message": "..."}
+    which is not valid JSON. The old code let json.loads throw and returned [],
+    throwing away every turn in the round — eight rounds of that produced
+    completely empty episodes. Now one malformed object costs one turn.
+    """
+    pattern = re.compile(
+        r'"speaker"\s*:\s*"([^"]{1,80})".*?"message"\s*:\s*"(.*?)"\s*[},]',
+        re.DOTALL,
+    )
+    salvaged = []
+    for speaker, message in pattern.findall(text):
+        message = message.replace('\\"', '"').replace('\\n', ' ').strip()
+        if message:
+            salvaged.append({"speaker": speaker, "message": message})
+    return salvaged
+
+
 def parse_responses(response):
-    """Parse JSON response from Groq API."""
-    try:
-        if isinstance(response, str):
-            return json.loads(response)
-        elif isinstance(response, list):
-            return response
-        else:
-            return []
-    except (json.JSONDecodeError, TypeError) as e:
-        print(f"Error parsing responses: {e}")
+    """Parse the model's reply into a list of {speaker, message} dicts.
+
+    Accepts a bare JSON array, a {"turns": [...]} object (what json_mode
+    returns), or malformed JSON that we salvage rather than discard.
+    """
+    if isinstance(response, list):
+        return response
+    if not isinstance(response, str):
         return []
+
+    text = response.strip()
+
+    # Models still wrap output in ```json fences now and then.
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text, flags=re.MULTILINE).strip()
+
+    try:
+        data = json.loads(text)
+    except (json.JSONDecodeError, TypeError) as e:
+        salvaged = _salvage_turns(text)
+        if salvaged:
+            print(f"[parse] malformed JSON ({e}) — salvaged {len(salvaged)} turn(s)")
+        else:
+            print(f"[parse] malformed JSON and nothing salvageable: {e}")
+            print(f"[parse] first 200 chars: {text[:200]!r}")
+        return salvaged
+
+    # json_mode returns an object; find the list inside it.
+    if isinstance(data, dict):
+        for key in ("turns", "conversation", "dialogue", "responses", "messages"):
+            if isinstance(data.get(key), list):
+                return data[key]
+        # Single turn returned bare
+        if "speaker" in data and "message" in data:
+            return [data]
+        print(f"[parse] JSON object had no turn list — keys: {list(data)[:6]}")
+        return []
+
+    return data if isinstance(data, list) else []
 
 def normalize_responses(parsed_responses, characters):
     """Normalize parsed responses to ensure proper speaker matching and structure."""
@@ -423,11 +472,11 @@ Rules:
 - Mix short bursts with longer points
 - Generate 6-8 turns for this opening
 
-Return ONLY a valid JSON array:
-[
-  {{"speaker": "...", "message": "..."}},
-  ...
-]"""
+Return ONLY a JSON object of this exact shape:
+{{"turns": [
+  {{"speaker": "...", "message": "..."}}
+]}}
+Every object must have exactly the two keys "speaker" and "message"."""
         else:
             is_final = (i == MAX_TURNS - 1)
             instruction = (
@@ -739,12 +788,13 @@ Rules for the conversation:
 - Mix short reactions with longer points
 - Generate 6 to 8 turns total for this opening exchange
 
-Return ONLY a valid JSON array (any order, any length):
-[
+Return ONLY a JSON object of this exact shape:
+{{"turns": [
   {{"speaker": "The Expert", "message": "..."}},
-  {{"speaker": "The Skeptic", "message": "..."}},
-  ...
-]"""
+  {{"speaker": "The Skeptic", "message": "..."}}
+]}}
+Every object must have exactly the two keys "speaker" and "message" — never
+add bare strings or stage directions inside an object."""
 
     recent = history[-10:] if len(history) > 10 else history
     context = "\n".join(f'{t["speaker"]}: {t["message"]}' for t in recent)
@@ -770,11 +820,11 @@ Rules:
 - Reference each other by name
 - 5 to 8 turns this round
 
-Return ONLY a valid JSON array:
-[
-  {{"speaker": "...", "message": "..."}},
-  ...
-]"""
+Return ONLY a JSON object of this exact shape:
+{{"turns": [
+  {{"speaker": "...", "message": "..."}}
+]}}
+Every object must have exactly the two keys "speaker" and "message"."""
 
 
 async def run_roundtable_streaming(topic: str, tts_enabled: bool = True):
@@ -788,7 +838,8 @@ async def run_roundtable_streaming(topic: str, tts_enabled: bool = True):
 
     system_prompt = (
         "You are producing a premium podcast with 4 distinct personalities having a real argument. "
-        "ALWAYS return a valid JSON array only — no extra text, no markdown, no explanation. "
+        "ALWAYS return a valid JSON object of the form {\"turns\": [...]} — no markdown, no explanation. "
+        "Each entry has exactly two keys: \"speaker\" and \"message\". "
         "The conversation must feel unscripted: unequal airtime, interruptions, short reactions, "
         "speakers referencing each other by name, disagreements, occasional jokes. "
         "Never rotate speakers in a fixed 1-2-3-4 pattern. Let the conversation breathe."
@@ -804,7 +855,8 @@ async def run_roundtable_streaming(topic: str, tts_enabled: bool = True):
                     {"role": "user",   "content": prompt},
                 ],
                 temperature=0.85,
-                max_tokens=1200,
+                max_tokens=2400,   # 1200 truncated mid-JSON and cost whole rounds
+                json_mode=True,    # stops the model emitting unparseable objects
             )
         except Exception as e:
             print(f"[stream] Groq error on round {round_num}: {e}")
