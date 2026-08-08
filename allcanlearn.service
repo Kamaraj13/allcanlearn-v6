@@ -6,8 +6,15 @@ After=network.target
 Type=simple
 User=vikki
 WorkingDirectory=/home/vikki/AllCanLearn-v6
-Environment=PATH=/home/vikki/AllCanLearn-v6/venv/bin
-EnvironmentFile=/home/vikki/AllCanLearn-v6/.env
+# The venv must come FIRST, but the system paths have to stay — the app shells
+# out to ffmpeg to merge episode audio, and a venv-only PATH makes ffmpeg
+# invisible even when it is installed, so every merge fails silently.
+Environment=PATH=/home/vikki/AllCanLearn-v6/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# The leading "-" makes a missing .env a warning instead of a fatal start
+# error. Without it, one deleted file stops the service from ever booting
+# (this took the site down on 8 Aug). The app also loads .env itself via
+# python-dotenv, so this is belt-and-braces.
+EnvironmentFile=-/home/vikki/AllCanLearn-v6/.env
 ExecStart=/home/vikki/AllCanLearn-v6/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
