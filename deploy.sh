@@ -1,6 +1,6 @@
 #!/bin/bash
 # deploy.sh — pull latest code and restart the app on the Ubuntu server
-# Run this from: /home/vikki/Desktop/roundtable/allcanlearn-v6
+# Run this from: /home/vikki/AllCanLearn-v6  (the live checkout — NOT the Desktop copy)
 
 set -e
 

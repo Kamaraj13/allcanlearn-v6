@@ -174,37 +174,6 @@ def get_episode_by_id(episode_id: str):
     return episode
 
 
-# Serve React app (prefer build/index.html, fall back to app/static/index.html)
-def _index_html():
-    if pathlib.Path("build/index.html").exists():
-        return "build/index.html"
-    return "app/static/index.html"
-
-
-# index.html names the content-hashed JS bundle, so it must NEVER be cached —
-# a stale copy pins visitors to an old build after every deploy. The hashed
-# assets under /static are immutable and cached hard by the browser.
-_NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
-
-
-def _index_response():
-    return FileResponse(_index_html(), headers=_NO_STORE)
-
-
-@app.get("/")
-async def read_index():
-    return _index_response()
-
-# Fallback for React Router - Must be LAST
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    # Don't intercept API routes, static files, tts_output, or quiz
-    if full_path.startswith('api/') or full_path.startswith('static/') or full_path.startswith('tts_output/') or full_path == 'quiz':
-        raise HTTPException(status_code=404, detail="Not found")
-    # Otherwise serve React app for client-side routing
-    return _index_response()
-
-
 @app.get("/api/tts/health")
 def tts_health():
     """What the TTS stack can actually do on this machine.
@@ -220,6 +189,28 @@ def tts_health():
 def get_audio_files_list():
     """Get list of all audio files"""
     return get_audio_files()
+
+
+# ── Everything below this line is the React app + catch-all ────────────────
+# FastAPI matches routes in REGISTRATION order, and the catch-all below
+# swallows every unmatched path. Any new /api/... route MUST be added above
+# here, or it will 404 no matter how it is written.
+
+# Serve React app (prefer build/index.html, fall back to app/static/index.html)
+def _index_html():
+    if pathlib.Path("build/index.html").exists():
+        return "build/index.html"
+    return "app/static/index.html"
+
+
+# index.html names the content-hashed JS bundle, so it must NEVER be cached —
+# a stale copy pins visitors to an old build after every deploy. The hashed
+# assets under /static are immutable and cached hard by the browser.
+_NO_STORE = {"Cache-Control": "no-store, must-revalidate"}
+
+
+def _index_response():
+    return FileResponse(_index_html(), headers=_NO_STORE)
 
 
 @app.get("/ui")
@@ -431,3 +422,27 @@ def get_online_users():
         "users": manager.get_online_users(),
         "count": len(manager.active_connections)
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  REACT APP + CATCH-ALL — THESE MUST BE THE LAST ROUTES IN THIS FILE
+#
+#  FastAPI matches routes in registration order. The catch-all below claims
+#  every remaining GET path, so any route declared after it is dead code.
+#  That is not hypothetical: /api/topics/popular, /api/leaderboard and
+#  /api/chat/online all returned 404 in production because they sat below it.
+#  Add new routes ABOVE this banner.
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.get("/")
+async def read_index():
+    return _index_response()
+
+
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # Don't intercept API routes, static files, tts_output, or quiz
+    if full_path.startswith('api/') or full_path.startswith('static/') or full_path.startswith('tts_output/') or full_path == 'quiz':
+        raise HTTPException(status_code=404, detail="Not found")
+    # Otherwise serve React app for client-side routing
+    return _index_response()
