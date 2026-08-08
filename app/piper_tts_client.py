@@ -98,9 +98,12 @@ def diagnose() -> dict:
     models = {}
     for spk, m in PIPER_SPEAKER_MODELS.items():
         models[spk] = os.path.exists(os.path.join(PIPER_DIR, m))
+    from app.audio_merger import find_ffmpeg
+    ffmpeg = find_ffmpeg()
     return {
         "groq_key_set":  bool(settings.GROQ_API_KEY),
         "piper_installed": os.path.exists(PIPER_BIN),
         "piper_models":  models,
-        "ffmpeg":        shutil.which("ffmpeg") is not None,
+        "ffmpeg":        ffmpeg or False,
+        "ffmpeg_on_path": shutil.which("ffmpeg") is not None,
     }

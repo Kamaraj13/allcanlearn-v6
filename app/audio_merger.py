@@ -3,11 +3,35 @@
 
 from __future__ import annotations
 import os
+import shutil
 import subprocess
 import tempfile
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Common install locations, checked when PATH doesn't have ffmpeg.
+# The systemd unit used to set PATH to the venv only, which made a perfectly
+# well-installed /usr/bin/ffmpeg invisible and silently broke every merge.
+# Resolving the binary ourselves means the app no longer depends on the
+# service file being right.
+_FFMPEG_FALLBACKS = (
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/opt/homebrew/bin/ffmpeg",
+    "/snap/bin/ffmpeg",
+)
+
+
+def find_ffmpeg() -> str | None:
+    """Absolute path to ffmpeg, or None if it genuinely isn't installed."""
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    for path in _FFMPEG_FALLBACKS:
+        if os.path.exists(path) and os.access(path, os.X_OK):
+            return path
+    return None
 
 
 def merge_turn_files(turn_files: list[str], output_path: str) -> bool:
@@ -33,6 +57,14 @@ def merge_turn_files(turn_files: list[str], output_path: str) -> bool:
         shutil.copy2(existing[0], output_path)
         return True
 
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        logger.error(
+            "ffmpeg not found — episode audio cannot be merged, so playback "
+            "falls back to one file per turn. Install with: sudo apt install ffmpeg"
+        )
+        return False
+
     # Write an ffmpeg concat list
     try:
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
@@ -44,7 +76,7 @@ def merge_turn_files(turn_files: list[str], output_path: str) -> bool:
 
         result = subprocess.run(
             [
-                'ffmpeg', '-y',
+                ffmpeg, '-y',
                 '-f', 'concat',
                 '-safe', '0',
                 '-i', list_path,
